@@ -2,6 +2,7 @@ import hashlib
 import hmac
 from datetime import UTC, datetime, timedelta
 
+from cryptography.fernet import Fernet
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -33,6 +34,18 @@ def decode_access_token(token: str) -> str:
     if subject is None:
         raise JWTError("Token missing subject")
     return subject
+
+
+def encrypt_token(token: str) -> str:
+    """Fernet-encrypt a plaintext token for storage in the database."""
+    f = Fernet(settings.FERNET_KEY.encode())
+    return f.encrypt(token.encode()).decode()
+
+
+def decrypt_token(encrypted: str) -> str:
+    """Decrypt a Fernet-encrypted token retrieved from the database."""
+    f = Fernet(settings.FERNET_KEY.encode())
+    return f.decrypt(encrypted.encode()).decode()
 
 
 def verify_github_webhook_signature(payload_body: bytes, signature_header: str) -> bool:

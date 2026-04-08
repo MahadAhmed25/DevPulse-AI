@@ -44,11 +44,13 @@ class Settings(BaseSettings):
     GITHUB_WEBHOOK_SECRET: str
 
     # -------------------------------------------------------------------------
-    # Auth (JWT)
+    # Auth (JWT + Fernet)
     # -------------------------------------------------------------------------
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 10080  # 7 days
+    # 32-byte URL-safe base64-encoded key — generate with: Fernet.generate_key().decode()
+    FERNET_KEY: str
 
     # -------------------------------------------------------------------------
     # Stripe

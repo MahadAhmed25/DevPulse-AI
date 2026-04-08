@@ -21,13 +21,18 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     github_id: Mapped[int | None] = mapped_column(unique=True, nullable=True, index=True)
     github_username: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Stored Fernet-encrypted — use security.encrypt_token / decrypt_token
     github_access_token: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
     subscription_tier: Mapped[str] = mapped_column(
         String(20), default="free", nullable=False
     )  # free | pro | team
+    subscription_status: Mapped[str] = mapped_column(
+        String(20), default="inactive", nullable=False
+    )  # active | inactive | past_due
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

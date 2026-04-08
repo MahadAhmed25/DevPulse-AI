@@ -13,6 +13,9 @@ class PullRequestRead(BaseModel):
     base_branch: str
     head_branch: str
     status: str
+    files_changed: int | None
+    lines_added: int | None
+    lines_removed: int | None
     created_at: datetime
     updated_at: datetime
 

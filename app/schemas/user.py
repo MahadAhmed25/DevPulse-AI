@@ -12,10 +12,13 @@ class UserCreate(UserBase):
     password: str
 
 
-class UserRead(UserBase):
+class UserRead(BaseModel):
     id: uuid.UUID
+    email: str | None
     github_username: str | None
+    avatar_url: str | None
     subscription_tier: str
+    subscription_status: str
     is_active: bool
     created_at: datetime
 

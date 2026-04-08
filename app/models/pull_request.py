@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -33,7 +33,10 @@ class PullRequest(Base):
     diff_s3_key: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     status: Mapped[str] = mapped_column(
         String(20), default="pending", nullable=False
-    )  # pending | processing | completed | failed
+    )  # pending | reviewing | complete | failed
+    files_changed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    lines_added: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    lines_removed: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -42,6 +45,10 @@ class PullRequest(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("repository_id", "github_pr_number", name="uq_pr_repo_number"),
     )
 
     repository: Mapped["Repository"] = relationship(  # noqa: F821

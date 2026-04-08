@@ -18,6 +18,7 @@ class RepositoryRead(RepositoryBase):
     github_repo_id: int
     is_active: bool
     is_indexed: bool
+    index_status: str
     last_indexed_at: datetime | None
     created_at: datetime
 
