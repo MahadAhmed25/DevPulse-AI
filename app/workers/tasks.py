@@ -103,9 +103,9 @@ def index_repository(self, repo_id: str) -> dict:  # type: ignore[no-untyped-def
                 except Exception as exc:
                     logger.warning("Skipping file", path=item.path, error=str(exc))
 
-            from datetime import datetime, timezone
+            from datetime import UTC, datetime
             repo.is_indexed = True
-            repo.last_indexed_at = datetime.now(timezone.utc)
+            repo.last_indexed_at = datetime.now(UTC)
             await db.commit()
 
             logger.info("Indexing complete", repo_id=repo_id, chunks=total_chunks)

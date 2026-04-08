@@ -1,6 +1,5 @@
 import structlog
-from github import Github, GithubException
-from github.PullRequest import PullRequest as GithubPR
+from github import Github
 from github.Repository import Repository as GithubRepo
 
 logger = structlog.get_logger(__name__)

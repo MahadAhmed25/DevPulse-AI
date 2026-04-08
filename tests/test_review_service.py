@@ -1,7 +1,5 @@
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from app.services.llm_service import LLMService
 

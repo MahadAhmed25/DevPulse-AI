@@ -3,7 +3,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.embedding_service import EMBEDDING_DIMENSION, EmbeddingService
+from app.services.embedding_service import EmbeddingService
 
 logger = structlog.get_logger(__name__)
 
