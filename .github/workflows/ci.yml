@@ -70,6 +70,8 @@ jobs:
           JWT_SECRET_KEY: test-jwt-secret-key-32-chars-minimum
           JWT_ALGORITHM: HS256
           JWT_EXPIRE_MINUTES: "10080"
+          # 32 null bytes base64url-encoded — valid Fernet key for CI only
+          FERNET_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           STRIPE_SECRET_KEY: test
           STRIPE_WEBHOOK_SECRET: test
           STRIPE_PRICE_PRO: price_test_pro
