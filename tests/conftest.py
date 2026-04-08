@@ -17,7 +17,7 @@ TestSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
 )
 
 
-@pytest_asyncio.fixture(scope="session", autouse=True)
+@pytest_asyncio.fixture(scope="session", loop_scope="session", autouse=True)
 async def create_tables():
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -26,14 +26,14 @@ async def create_tables():
         await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def db_session():
     async with TestSessionLocal() as session:
         yield session
         await session.rollback()
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def client(db_session: AsyncSession):
     async def override_get_db():
         yield db_session
