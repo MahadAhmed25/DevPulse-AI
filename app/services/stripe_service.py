@@ -1,3 +1,5 @@
+from typing import Any
+
 import stripe
 import structlog
 from sqlalchemy import select
@@ -50,7 +52,7 @@ class StripeService:
             customer=customer_id,
             return_url=return_url,
         )
-        return session.url
+        return str(session.url or "")
 
     async def handle_webhook(
         self,
@@ -75,7 +77,7 @@ class StripeService:
             await self._handle_subscription_change(event["data"]["object"], db)
 
     async def _handle_checkout_completed(
-        self, session: dict, db: AsyncSession
+        self, session: dict[str, Any], db: AsyncSession
     ) -> None:
         user_id: str = session["metadata"]["user_id"]
         customer_id: str = session["customer"]
@@ -93,7 +95,7 @@ class StripeService:
             logger.info("Subscription activated", user_id=user_id, tier=tier)
 
     async def _handle_subscription_change(
-        self, subscription: dict, db: AsyncSession
+        self, subscription: dict[str, Any], db: AsyncSession
     ) -> None:
         customer_id: str = subscription["customer"]
         status: str = subscription["status"]

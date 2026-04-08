@@ -30,7 +30,7 @@ class S3Service:
     def download_diff(self, key: str) -> str:
         """Download and return a PR diff from S3 as a string."""
         response = self._client.get_object(Bucket=self._bucket, Key=key)
-        return response["Body"].read().decode("utf-8")
+        return response["Body"].read().decode("utf-8")  # type: ignore[no-any-return]
 
     def delete_object(self, key: str) -> None:
         try:

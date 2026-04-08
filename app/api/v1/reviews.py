@@ -46,7 +46,7 @@ async def list_reviews(
         await db.execute(query.offset(skip).limit(limit).order_by(Review.created_at.desc()))
     ).scalars().all()
 
-    return ReviewList(items=list(reviews), total=total)
+    return ReviewList(items=list(reviews), total=total)  # type: ignore[arg-type]
 
 
 @router.get("/{review_id}", response_model=ReviewRead)

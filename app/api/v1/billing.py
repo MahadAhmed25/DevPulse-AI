@@ -1,3 +1,5 @@
+from typing import Any
+
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +20,7 @@ async def create_checkout_session(
     tier: str,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
-) -> dict:
+) -> dict[str, Any]:
     """Create a Stripe Checkout session for the given tier (pro | team)."""
     if tier not in ("pro", "team"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid tier")
@@ -37,7 +39,7 @@ async def create_checkout_session(
 @router.post("/portal")
 async def create_billing_portal(
     current_user: User = Depends(get_current_active_user),
-) -> dict:
+) -> dict[str, Any]:
     """Create a Stripe billing portal session for the current user."""
     if not current_user.stripe_customer_id:
         raise HTTPException(
@@ -56,7 +58,7 @@ async def create_billing_portal(
 async def stripe_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db),
-) -> dict:
+) -> dict[str, Any]:
     """Handle Stripe webhook events (subscription lifecycle)."""
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")

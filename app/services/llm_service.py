@@ -59,7 +59,7 @@ existing patterns. Return ONLY the JSON object described in the system prompt.""
         )
 
         tokens_used = message.usage.input_tokens + message.usage.output_tokens
-        raw_content = message.content[0].text.strip()
+        raw_content = message.content[0].text.strip()  # type: ignore[union-attr]
 
         try:
             structured = json.loads(raw_content)

@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -36,7 +37,7 @@ async def list_repositories(
         .order_by(Repository.created_at.desc())
     )
     repos = result.scalars().all()
-    return RepositoryList(items=list(repos), total=total)
+    return RepositoryList(items=list(repos), total=total)  # type: ignore[arg-type]
 
 
 @router.post("", response_model=RepositoryRead, status_code=status.HTTP_201_CREATED)
@@ -72,7 +73,7 @@ async def trigger_indexing(
     repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
-) -> dict:
+) -> dict[str, Any]:
     result = await db.execute(
         select(Repository).where(
             Repository.id == repo_id, Repository.owner_id == current_user.id

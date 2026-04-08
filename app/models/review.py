@@ -1,11 +1,15 @@
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.pull_request import PullRequest
 
 
 class Review(Base):
@@ -21,7 +25,7 @@ class Review(Base):
         index=True,
     )
     # Raw LLM output stored as JSONB for flexible querying
-    structured_review: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    structured_review: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     bugs_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     suggestions_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

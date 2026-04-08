@@ -1,3 +1,5 @@
+from typing import Any
+
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
@@ -19,7 +21,7 @@ async def github_webhook(
     x_hub_signature_256: str = Header(...),
     x_github_event: str = Header(...),
     db: AsyncSession = Depends(get_db),
-) -> dict:
+) -> dict[str, Any]:
     """Receive GitHub webhook events. Verifies HMAC signature before processing."""
     payload_bytes = await request.body()
 

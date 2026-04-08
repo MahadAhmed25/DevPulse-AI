@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 
 import structlog
 from github import Github
@@ -20,17 +21,17 @@ def _run_async(coro):  # type: ignore[no-untyped-def]
         loop.close()
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[misc]
     name="app.workers.tasks.run_pr_review",
     bind=True,
     max_retries=3,
     default_retry_delay=30,
 )
-def run_pr_review(self, pr_id: str) -> dict:  # type: ignore[no-untyped-def]
+def run_pr_review(self, pr_id: str) -> dict[str, Any]:  # type: ignore[no-untyped-def]
     """Celery task: run the full review pipeline for a pull request."""
     logger.info("Starting PR review task", pr_id=pr_id, attempt=self.request.retries + 1)
 
-    async def _execute() -> dict:
+    async def _execute() -> dict[str, Any]:
         async with AsyncSessionLocal() as db:
             service = ReviewService(db)
             review = await service.run_review(pr_id)
@@ -38,19 +39,19 @@ def run_pr_review(self, pr_id: str) -> dict:  # type: ignore[no-untyped-def]
             return {"review_id": str(review.id), "pr_id": pr_id}
 
     try:
-        return _run_async(_execute())
+        return _run_async(_execute())  # type: ignore[no-any-return, no-untyped-call]
     except Exception as exc:
         logger.error("PR review task failed", pr_id=pr_id, error=str(exc))
         raise self.retry(exc=exc)
 
 
-@celery_app.task(
+@celery_app.task(  # type: ignore[misc]
     name="app.workers.tasks.index_repository",
     bind=True,
     max_retries=2,
     default_retry_delay=60,
 )
-def index_repository(self, repo_id: str) -> dict:  # type: ignore[no-untyped-def]
+def index_repository(self, repo_id: str) -> dict[str, Any]:  # type: ignore[no-untyped-def]
     """Celery task: clone and index an entire repository into pgvector."""
     from sqlalchemy import select
 
@@ -59,7 +60,7 @@ def index_repository(self, repo_id: str) -> dict:  # type: ignore[no-untyped-def
 
     logger.info("Starting indexing task", repo_id=repo_id)
 
-    async def _execute() -> dict:
+    async def _execute() -> dict[str, Any]:
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(Repository).where(Repository.id == repo_id))
             repo = result.scalar_one_or_none()
@@ -112,7 +113,7 @@ def index_repository(self, repo_id: str) -> dict:  # type: ignore[no-untyped-def
             return {"repo_id": repo_id, "chunks": total_chunks}
 
     try:
-        return _run_async(_execute())
+        return _run_async(_execute())  # type: ignore[no-any-return, no-untyped-call]
     except Exception as exc:
         logger.error("Indexing task failed", repo_id=repo_id, error=str(exc))
         raise self.retry(exc=exc)

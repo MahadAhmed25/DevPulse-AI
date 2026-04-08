@@ -1,3 +1,5 @@
+from typing import Any
+
 import httpx
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -31,7 +33,7 @@ async def github_login() -> RedirectResponse:
 async def github_callback(
     code: str,
     db: AsyncSession = Depends(get_db),
-) -> dict:
+) -> dict[str, Any]:
     """Exchange GitHub OAuth code for an access token, upsert user, return JWT."""
     async with httpx.AsyncClient() as client:
         # Exchange code for GitHub access token

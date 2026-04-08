@@ -1,3 +1,5 @@
+from typing import Any
+
 import structlog
 from github import Github
 from github.Repository import Repository as GithubRepo
@@ -33,7 +35,7 @@ class GitHubService:
         self,
         full_name: str,
         pr_number: int,
-        comments: list[dict],
+        comments: list[dict[str, Any]],
         summary: str,
     ) -> int:
         """Post inline review comments and a summary review body to a PR.
@@ -79,7 +81,7 @@ class GitHubService:
         )
         return hook.id
 
-    def list_user_repos(self) -> list[dict]:
+    def list_user_repos(self) -> list[dict[str, Any]]:
         """Return a list of repos the authenticated user has access to."""
         user = self._client.get_user()
         return [
