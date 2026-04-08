@@ -5,8 +5,6 @@ import json
 import pytest
 from httpx import AsyncClient
 
-pytestmark = pytest.mark.asyncio(loop_scope="session")
-
 
 def _sign_payload(payload: bytes, secret: str) -> str:
     sig = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
