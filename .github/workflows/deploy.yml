@@ -1,0 +1,82 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+  ECR_REPOSITORY: devpulse
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ env.IMAGE_TAG }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push API image
+        run: |
+          docker build \
+            --target production \
+            --tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            --tag $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            --file Dockerfile \
+            .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Build and push Worker image
+        run: |
+          docker build \
+            --target production \
+            --tag $ECR_REGISTRY/$ECR_REPOSITORY-worker:$IMAGE_TAG \
+            --tag $ECR_REGISTRY/$ECR_REPOSITORY-worker:latest \
+            --file Dockerfile.worker \
+            .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-worker:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-worker:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+          scp -i /tmp/deploy_key -o StrictHostKeyChecking=no \
+            scripts/deploy.sh $EC2_USER@$EC2_HOST:/home/$EC2_USER/deploy.sh
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
+            $EC2_USER@$EC2_HOST \
+            "IMAGE_TAG=$IMAGE_TAG ECR_REGISTRY=$ECR_REGISTRY bash /home/$EC2_USER/deploy.sh"
+          rm /tmp/deploy_key

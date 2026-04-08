@@ -1,0 +1,74 @@
+version: "3.9"
+
+# Production — postgres and redis are AWS managed (RDS + ElastiCache).
+# No local databases. All secrets injected at runtime via environment variables.
+# Images pulled from Amazon ECR.
+
+services:
+  api:
+    image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      BEDROCK_EMBEDDING_MODEL_ID: ${BEDROCK_EMBEDDING_MODEL_ID}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO}
+      STRIPE_PRICE_TEAM: ${STRIPE_PRICE_TEAM}
+      FRONTEND_URL: ${FRONTEND_URL}
+      ENVIRONMENT: production
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: always
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: /devpulse/api
+        awslogs-stream: api
+
+  worker:
+    image: ${ECR_REGISTRY}/${ECR_REPOSITORY}-worker:${IMAGE_TAG:-latest}
+    command: >
+      celery -A app.workers.celery_app worker
+      --loglevel=info
+      --concurrency=2
+      --queues=reviews,indexing
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      BEDROCK_EMBEDDING_MODEL_ID: ${BEDROCK_EMBEDDING_MODEL_ID}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO}
+      STRIPE_PRICE_TEAM: ${STRIPE_PRICE_TEAM}
+      FRONTEND_URL: ${FRONTEND_URL}
+      ENVIRONMENT: production
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: always
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: /devpulse/worker
+        awslogs-stream: worker

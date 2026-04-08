@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: devpulse
+          POSTGRES_PASSWORD: devpulse
+          POSTGRES_DB: devpulse_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U devpulse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint with ruff
+        run: ruff check app tests
+
+      - name: Type check with mypy
+        run: mypy app
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://devpulse:devpulse@localhost:5432/devpulse_test
+          REDIS_URL: redis://localhost:6379/0
+          AWS_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          S3_BUCKET_NAME: test-bucket
+          BEDROCK_EMBEDDING_MODEL_ID: amazon.titan-embed-text-v2:0
+          ANTHROPIC_API_KEY: test
+          GITHUB_CLIENT_ID: test
+          GITHUB_CLIENT_SECRET: test
+          GITHUB_WEBHOOK_SECRET: test-webhook-secret
+          JWT_SECRET_KEY: test-jwt-secret-key-32-chars-minimum
+          JWT_ALGORITHM: HS256
+          JWT_EXPIRE_MINUTES: "10080"
+          STRIPE_SECRET_KEY: test
+          STRIPE_WEBHOOK_SECRET: test
+          STRIPE_PRICE_PRO: price_test_pro
+          STRIPE_PRICE_TEAM: price_test_team
+          FRONTEND_URL: http://localhost:3000
+          ENVIRONMENT: development
+          LOG_LEVEL: INFO
+        run: pytest --cov=app --cov-report=term-missing -v

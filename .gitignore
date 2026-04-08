@@ -1,0 +1,98 @@
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ruff
+.ruff_cache/
+
+# =============================================================================
+# Environment & Secrets
+# =============================================================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# =============================================================================
+# IDE
+# =============================================================================
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# =============================================================================
+# Terraform
+# =============================================================================
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
+infra/terraform.tfvars
+infra/*.tfplan
+infra/override.tf
+infra/override.tf.json
+infra/*_override.tf
+infra/*_override.tf.json
+
+# =============================================================================
+# Docker
+# =============================================================================
+.docker/
+
+# =============================================================================
+# Logs
+# =============================================================================
+*.log
+logs/
+
+# =============================================================================
+# Alembic
+# =============================================================================
+alembic/versions/*.pyc

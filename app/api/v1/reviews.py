@@ -1,0 +1,67 @@
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_current_active_user
+from app.database import get_db
+from app.models.pull_request import PullRequest
+from app.models.repository import Repository
+from app.models.review import Review
+from app.models.user import User
+from app.schemas.review import ReviewList, ReviewRead
+
+router = APIRouter()
+
+
+@router.get("", response_model=ReviewList)
+async def list_reviews(
+    skip: int = 0,
+    limit: int = 20,
+    repository_id: uuid.UUID | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> ReviewList:
+    query = (
+        select(Review)
+        .join(PullRequest, Review.pull_request_id == PullRequest.id)
+        .join(Repository, PullRequest.repository_id == Repository.id)
+        .where(Repository.owner_id == current_user.id)
+    )
+    count_query = (
+        select(func.count())
+        .select_from(Review)
+        .join(PullRequest, Review.pull_request_id == PullRequest.id)
+        .join(Repository, PullRequest.repository_id == Repository.id)
+        .where(Repository.owner_id == current_user.id)
+    )
+
+    if repository_id:
+        query = query.where(Repository.id == repository_id)
+        count_query = count_query.where(Repository.id == repository_id)
+
+    total = (await db.execute(count_query)).scalar_one()
+    reviews = (
+        await db.execute(query.offset(skip).limit(limit).order_by(Review.created_at.desc()))
+    ).scalars().all()
+
+    return ReviewList(items=list(reviews), total=total)
+
+
+@router.get("/{review_id}", response_model=ReviewRead)
+async def get_review(
+    review_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Review:
+    result = await db.execute(
+        select(Review)
+        .join(PullRequest, Review.pull_request_id == PullRequest.id)
+        .join(Repository, PullRequest.repository_id == Repository.id)
+        .where(Review.id == review_id, Repository.owner_id == current_user.id)
+    )
+    review = result.scalar_one_or_none()
+    if review is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
+    return review
