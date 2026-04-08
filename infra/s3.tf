@@ -1,14 +1,18 @@
+resource "random_id" "suffix" {
+  byte_length = 4
+}
+
 resource "aws_s3_bucket" "artifacts" {
-  bucket        = var.s3_bucket_name
+  bucket        = "${var.project_name}-diffs-${random_id.suffix.hex}"
   force_destroy = false
 
-  tags = { Name = var.s3_bucket_name }
+  tags = { Name = "${var.project_name}-diffs-${random_id.suffix.hex}" }
 }
 
 resource "aws_s3_bucket_versioning" "artifacts" {
   bucket = aws_s3_bucket.artifacts.id
   versioning_configuration {
-    status = "Enabled"
+    status = "Disabled"
   }
 }
 
@@ -37,7 +41,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
     status = "Enabled"
 
     filter {
-      prefix = "diffs/"
+      prefix = ""
     }
 
     expiration {

@@ -10,58 +10,29 @@ variable "environment" {
   description = "Deployment environment (production | staging)"
 }
 
-variable "project" {
+variable "project_name" {
   type        = string
   default     = "devpulse"
   description = "Project name prefix used in resource names"
 }
 
-variable "vpc_cidr" {
-  type    = string
-  default = "10.0.0.0/16"
+variable "tf_state_bucket" {
+  type        = string
+  description = "S3 bucket name for Terraform remote state (create manually before terraform init)"
 }
 
-variable "public_subnet_cidrs" {
-  type    = list(string)
-  default = ["10.0.1.0/24", "10.0.2.0/24"]
+variable "db_password" {
+  type        = string
+  sensitive   = true
+  description = "Master password for the RDS PostgreSQL instance"
 }
 
-variable "private_subnet_cidrs" {
-  type    = list(string)
-  default = ["10.0.11.0/24", "10.0.12.0/24"]
-}
-
-variable "ec2_instance_type" {
-  type    = string
-  default = "t2.micro"
-}
-
-variable "ec2_key_name" {
+variable "ec2_key_pair_name" {
   type        = string
   description = "Name of an existing EC2 key pair for SSH access"
 }
 
-variable "rds_instance_class" {
-  type    = string
-  default = "db.t3.micro"
-}
-
-variable "rds_username" {
-  type      = string
-  sensitive = true
-}
-
-variable "rds_password" {
-  type      = string
-  sensitive = true
-}
-
-variable "rds_database_name" {
-  type    = string
-  default = "devpulse"
-}
-
-variable "s3_bucket_name" {
+variable "your_ip_cidr" {
   type        = string
-  description = "Globally unique S3 bucket name for PR diffs and artifacts"
+  description = "Your IP address in CIDR notation for SSH access (e.g. 203.0.113.1/32)"
 }

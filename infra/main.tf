@@ -1,18 +1,24 @@
 terraform {
-  required_version = ">= 1.9"
+  required_version = ">= 1.6"
 
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 
-  # Remote state in S3 — create this bucket manually before first apply
+  # Remote state in S3 — Terraform backend blocks do not support variable
+  # interpolation. Create this bucket manually before running terraform init,
+  # then pass the name via: terraform init -backend-config="bucket=<your-bucket>"
   backend "s3" {
-    bucket = "devpulse-terraform-state"
-    key    = "devpulse/terraform.tfstate"
-    region = "us-east-1"
+    bucket  = "REPLACE-WITH-YOUR-TF-STATE-BUCKET"
+    key     = "devpulse/terraform.tfstate"
+    region  = "us-east-1"
     encrypt = true
   }
 }
@@ -22,7 +28,7 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "devpulse-ai"
+      Project     = var.project_name
       Environment = var.environment
       ManagedBy   = "terraform"
     }

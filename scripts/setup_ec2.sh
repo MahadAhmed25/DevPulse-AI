@@ -1,58 +1,72 @@
 #!/usr/bin/env bash
 # =============================================================================
-# setup_ec2.sh — Bootstrap script for a fresh Amazon Linux 2023 EC2 instance.
-# Run once after provisioning. Installs Docker, aws-cli v2, and sets up dirs.
+# setup_ec2.sh — EC2 user_data bootstrap for Amazon Linux 2023.
+# Runs once on first boot via cloud-init. Installs Docker, CloudWatch agent,
+# and registers a systemd service that starts the app on every boot.
 # =============================================================================
 set -euo pipefail
 
 echo "[setup] Updating system packages..."
-sudo dnf update -y
+yum update -y
 
+# ---------------------------------------------------------------------------
+# Docker
+# ---------------------------------------------------------------------------
 echo "[setup] Installing Docker..."
-sudo dnf install -y docker
-sudo systemctl enable docker
-sudo systemctl start docker
-sudo usermod -aG docker ec2-user
+yum install -y docker
+systemctl enable docker
+systemctl start docker
+usermod -aG docker ec2-user
 
 echo "[setup] Installing Docker Compose plugin..."
-DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
-mkdir -p "$DOCKER_CONFIG/cli-plugins"
+mkdir -p /usr/local/lib/docker/cli-plugins
 curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
-  -o "$DOCKER_CONFIG/cli-plugins/docker-compose"
-chmod +x "$DOCKER_CONFIG/cli-plugins/docker-compose"
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
 
-echo "[setup] Installing AWS CLI v2..."
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip -q awscliv2.zip
-sudo ./aws/install
-rm -rf awscliv2.zip aws/
+# ---------------------------------------------------------------------------
+# CloudWatch agent
+# ---------------------------------------------------------------------------
+echo "[setup] Installing CloudWatch agent..."
+yum install -y amazon-cloudwatch-agent
+systemctl enable amazon-cloudwatch-agent
+systemctl start amazon-cloudwatch-agent
 
+# ---------------------------------------------------------------------------
+# Application directory
+# ---------------------------------------------------------------------------
 echo "[setup] Creating application directory..."
 mkdir -p /home/ec2-user/devpulse
+chown -R ec2-user:ec2-user /home/ec2-user/devpulse
 
-echo "[setup] Creating .env file template (fill in values before deploying)..."
-cat > /home/ec2-user/devpulse/.env << 'ENVEOF'
-# Fill these in — never commit to git
-DATABASE_URL=
-REDIS_URL=
-AWS_REGION=us-east-1
-S3_BUCKET_NAME=
-BEDROCK_EMBEDDING_MODEL_ID=amazon.titan-embed-text-v2:0
-ANTHROPIC_API_KEY=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
-GITHUB_WEBHOOK_SECRET=
-JWT_SECRET_KEY=
-JWT_ALGORITHM=HS256
-JWT_EXPIRE_MINUTES=10080
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-STRIPE_PRICE_PRO=
-STRIPE_PRICE_TEAM=
-FRONTEND_URL=
-ENVIRONMENT=production
-LOG_LEVEL=INFO
-ENVEOF
+# ---------------------------------------------------------------------------
+# Systemd service — starts docker-compose.prod.yml on every boot
+# ---------------------------------------------------------------------------
+echo "[setup] Registering devpulse systemd service..."
+cat > /etc/systemd/system/devpulse.service << 'EOF'
+[Unit]
+Description=DevPulse AI Application
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
 
-echo "[setup] Done. Log out and back in for Docker group to take effect."
-echo "[setup] Then copy docker-compose.prod.yml to /home/ec2-user/devpulse/ and run deploy.sh"
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/ec2-user/devpulse
+ExecStart=/usr/local/bin/docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+ExecStop=/usr/local/bin/docker-compose -f docker-compose.prod.yml down
+TimeoutStartSec=300
+User=ec2-user
+Group=ec2-user
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable devpulse
+
+echo "[setup] Bootstrap complete. EC2 is ready for first deployment."
+echo "[setup] Next: run deploy.sh to push images and start the app."
