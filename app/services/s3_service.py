@@ -1,5 +1,6 @@
 import json
 import uuid
+from typing import Any
 
 import boto3
 import structlog
@@ -54,7 +55,7 @@ class S3Service:
         except ClientError as exc:
             raise S3ServiceError(f"Failed to download diff at {s3_key}: {exc}") from exc
 
-    def upload_review(self, review_id: uuid.UUID, review_data: dict) -> str:
+    def upload_review(self, review_id: uuid.UUID, review_data: dict[str, Any]) -> str:
         """Serialise review_data to JSON and upload to S3. Returns the S3 key."""
         key = review_key(review_id)
         try:
@@ -69,7 +70,7 @@ class S3Service:
         logger.info("Review uploaded to S3", bucket=self._bucket, key=key)
         return key
 
-    def download_review(self, s3_key: str) -> dict:
+    def download_review(self, s3_key: str) -> dict[str, Any]:
         """Download and parse a review JSON object from S3."""
         try:
             response = self._client.get_object(Bucket=self._bucket, Key=s3_key)

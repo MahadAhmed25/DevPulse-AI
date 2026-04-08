@@ -94,5 +94,5 @@ async def get_me(current_user: User = Depends(get_current_user)) -> User:
 
 
 @router.post("/logout")
-async def logout() -> dict:
+async def logout() -> dict[str, str]:
     return {"message": "logged out"}

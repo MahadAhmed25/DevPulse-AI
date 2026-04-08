@@ -6,10 +6,11 @@ from app.models.pull_request import PullRequest
 from app.models.repository import Repository
 from app.models.review import Review
 from app.models.user import User
-from app.services.github_service import GitHubService
+from app.services import github_service
 from app.services.llm_service import LLMService
 from app.services.rag_service import RAGService
 from app.services.s3_service import S3Service
+from app.utils.security import decrypt_token
 
 logger = structlog.get_logger(__name__)
 
@@ -30,12 +31,11 @@ class ReviewService:
         await self._db.flush()
 
         try:
-            github = GitHubService(user.github_access_token or "")
-            diff = github.get_pull_request_diff(repo.full_name, pr.github_pr_number)
+            access_token = decrypt_token(user.github_access_token or "")
+            diff = await github_service.get_pr_diff(access_token, repo.full_name, pr.github_pr_number)
 
             # Persist diff to S3
-            s3_key = f"diffs/{repo.id}/{pr.id}.diff"
-            self._s3.upload_diff(s3_key, diff)
+            s3_key = self._s3.upload_diff(pr.id, diff)
             pr.diff_s3_key = s3_key
 
             # Retrieve RAG context
@@ -65,11 +65,12 @@ class ReviewService:
 
             # Post back to GitHub
             if comments:
-                github_review_id = github.post_review_comments(
+                github_review_id = await github_service.post_pr_review(
+                    access_token=access_token,
                     full_name=repo.full_name,
                     pr_number=pr.github_pr_number,
+                    body=structured_review.get("summary", ""),
                     comments=comments,
-                    summary=structured_review.get("summary", ""),
                 )
                 review.github_review_id = github_review_id
 

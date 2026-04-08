@@ -53,7 +53,7 @@ async def health_redis() -> dict[str, Any]:
         logger.warning("Health Redis check failed", error=str(exc))
         return {"status": "error", "detail": str(exc)}
     finally:
-        await client.aclose()
+        await client.close()
 
 
 @router.get("/s3")

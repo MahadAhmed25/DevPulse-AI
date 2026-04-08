@@ -1,3 +1,5 @@
+from typing import Any
+
 import httpx
 import structlog
 
@@ -58,17 +60,17 @@ async def exchange_code_for_token(code: str) -> str:
     return token
 
 
-async def get_github_user(access_token: str) -> dict:
+async def get_github_user(access_token: str) -> dict[str, Any]:
     """Return the authenticated user's GitHub profile as a dict."""
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.get(f"{BASE_URL}/user", headers=_headers(access_token))
     _raise_for_status(response)
-    data: dict = response.json()
+    data: dict[str, Any] = response.json()
     logger.info("Fetched GitHub user profile", login=data.get("login"))
     return data
 
 
-async def list_user_repos(access_token: str) -> list[dict]:
+async def list_user_repos(access_token: str) -> list[dict[str, Any]]:
     """Return repos owned by the authenticated user (up to 100)."""
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.get(
@@ -77,7 +79,7 @@ async def list_user_repos(access_token: str) -> list[dict]:
             params={"type": "owner", "per_page": 100},
         )
     _raise_for_status(response)
-    repos: list[dict] = response.json()
+    repos: list[dict[str, Any]] = response.json()
     result = [
         {
             "github_repo_id": r["id"],
@@ -110,7 +112,7 @@ async def get_pr_diff(access_token: str, full_name: str, pr_number: int) -> str:
 
 async def get_repo_contents(
     access_token: str, full_name: str, path: str = ""
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Return the contents of a repository path."""
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.get(
@@ -118,7 +120,7 @@ async def get_repo_contents(
             headers=_headers(access_token),
         )
     _raise_for_status(response)
-    contents: list[dict] = response.json()
+    contents: list[dict[str, Any]] = response.json()
     logger.info("Fetched repo contents", repo=full_name, path=path)
     return contents
 
@@ -128,7 +130,7 @@ async def post_pr_review(
     full_name: str,
     pr_number: int,
     body: str,
-    comments: list[dict],
+    comments: list[dict[str, Any]],
 ) -> int:
     """Post an inline review to a PR. Returns the GitHub review ID."""
     async with httpx.AsyncClient(timeout=30.0) as client:
