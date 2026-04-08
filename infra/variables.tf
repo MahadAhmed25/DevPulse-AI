@@ -33,7 +33,7 @@ variable "private_subnet_cidrs" {
 
 variable "ec2_instance_type" {
   type    = string
-  default = "t3.small"
+  default = "t2.micro"
 }
 
 variable "ec2_key_name" {
@@ -59,11 +59,6 @@ variable "rds_password" {
 variable "rds_database_name" {
   type    = string
   default = "devpulse"
-}
-
-variable "elasticache_node_type" {
-  type    = string
-  default = "cache.t3.micro"
 }
 
 variable "s3_bucket_name" {

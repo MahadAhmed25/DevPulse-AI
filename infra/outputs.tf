@@ -9,12 +9,6 @@ output "rds_endpoint" {
   sensitive   = true
 }
 
-output "elasticache_endpoint" {
-  description = "ElastiCache Redis primary endpoint"
-  value       = aws_elasticache_cluster.redis.cache_nodes[0].address
-  sensitive   = true
-}
-
 output "ecr_repository_url" {
   description = "ECR repository URL for the API image"
   value       = aws_ecr_repository.app.repository_url
