@@ -6,10 +6,24 @@ from pydantic import BaseModel
 
 
 class ReviewComment(BaseModel):
-    path: str
-    line: int
+    file_path: str
+    line_number: int
+    severity: str  # bug | security | performance | suggestion | style
+    title: str
     body: str
-    severity: str  # bug | suggestion | security | style
+
+
+class ReviewResult(BaseModel):
+    """Structured output from the LLM — internal use only, not the API response schema."""
+    summary: str
+    verdict: str  # approve | request_changes | comment
+    comments: list[ReviewComment]
+    bugs_found: int
+    security_issues: int
+    suggestions: int
+    model_used: str
+    tokens_used: int
+    processing_time_ms: int
 
 
 class ReviewRead(BaseModel):

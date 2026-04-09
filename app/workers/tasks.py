@@ -7,7 +7,6 @@ from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
 from app.models.repository import Repository
-from app.services.rag_service import RAGService
 from app.services.review_service import ReviewService
 from app.workers.celery_app import celery_app
 
@@ -29,14 +28,48 @@ def _run_async(coro):  # type: ignore[no-untyped-def]
     max_retries=3,
     default_retry_delay=30,
 )
-def run_pr_review(self, pr_id: str) -> dict[str, Any]:  # type: ignore[no-untyped-def]
-    """Celery task: run the full review pipeline for a pull request."""
+def run_pr_review(self: Any, pr_id: str) -> dict[str, Any]:
+    """Celery task: run the full AI review pipeline for a pull request."""
     logger.info("Starting PR review task", pr_id=pr_id, attempt=self.request.retries + 1)
 
     async def _execute() -> dict[str, Any]:
+        from app.models.pull_request import PullRequest
+        from app.models.user import User
+
         async with AsyncSessionLocal() as db:
+            pr_result = await db.execute(
+                select(PullRequest).where(PullRequest.id == pr_id)
+            )
+            pr = pr_result.scalar_one_or_none()
+            if pr is None:
+                raise ValueError(f"PullRequest {pr_id} not found")
+
+            repo_result = await db.execute(
+                select(Repository).where(Repository.id == pr.repository_id)
+            )
+            repo = repo_result.scalar_one_or_none()
+            if repo is None:
+                raise ValueError(f"Repository {pr.repository_id} not found")
+
+            user_result = await db.execute(
+                select(User).where(User.id == repo.owner_id)
+            )
+            user = user_result.scalar_one_or_none()
+            if user is None or not user.github_access_token:
+                raise ValueError(f"User {repo.owner_id} not found or missing token")
+
+            use_sonnet = user.subscription_tier in ("pro", "team")
+
             service = ReviewService(db)
-            review = await service.run_review(pr_id)
+            review = await service.run_review(
+                pr_id=UUID(pr_id),
+                repo_id=repo.id,
+                pr_number=pr.github_pr_number,
+                full_name=repo.full_name,
+                pr_title=pr.title,
+                encrypted_token=user.github_access_token,
+                use_sonnet=use_sonnet,
+            )
             await db.commit()
             return {"review_id": str(review.id), "pr_id": pr_id}
 
@@ -57,6 +90,8 @@ def index_repository(
     self: Any, repo_id: str, full_name: str, encrypted_token: str
 ) -> dict[str, Any]:
     """Celery task: fetch and index an entire repository into pgvector via Bedrock embeddings."""
+    from app.services.rag_service import RAGService
+
     logger.info("Starting indexing task", repo_id=repo_id)
 
     async def _execute() -> dict[str, Any]:

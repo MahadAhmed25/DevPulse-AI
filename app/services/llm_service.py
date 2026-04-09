@@ -1,78 +1,123 @@
 import json
-from typing import Any
+import time
 
 import anthropic
 import structlog
 
 from app.config import get_settings
+from app.schemas.review import ReviewComment, ReviewResult
 
 logger = structlog.get_logger(__name__)
 
-REVIEW_SYSTEM_PROMPT = """You are DevPulse AI, an expert code reviewer.
-You analyse GitHub pull request diffs alongside relevant context from the repository.
-You return structured, actionable feedback only — no filler, no praise.
+HAIKU_MODEL = "claude-haiku-4-5-20251001"
+SONNET_MODEL = "claude-sonnet-4-6"
 
-Respond ONLY with a valid JSON object matching this schema:
+SYSTEM_PROMPT = """You are an expert code reviewer. You analyze pull request diffs and provide
+structured, actionable feedback. You are given:
+1. The PR diff showing what changed
+2. Relevant context from the existing codebase retrieved via semantic search
+
+Your review must be thorough but concise. Focus on:
+- Bugs and logic errors (highest priority)
+- Security vulnerabilities (SQL injection, auth bypass, secrets in code, etc.)
+- Performance issues (N+1 queries, unnecessary loops, memory leaks)
+- Code quality (naming, duplication, missing error handling)
+- Missing tests for changed logic
+
+Respond ONLY with valid JSON matching this exact schema:
 {
-  "summary": "<1-3 sentence overall assessment>",
+  "summary": "2-3 sentence overall assessment",
+  "verdict": "approve" | "request_changes" | "comment",
   "comments": [
     {
-      "path": "<file path>",
-      "line": <line number as integer>,
-      "severity": "<bug|suggestion|security|style>",
-      "body": "<concise actionable comment>"
+      "file_path": "path/to/file.py",
+      "line_number": 42,
+      "severity": "bug" | "security" | "performance" | "suggestion" | "style",
+      "title": "Short title",
+      "body": "Detailed explanation with suggested fix"
     }
-  ]
+  ],
+  "bugs_found": <integer>,
+  "security_issues": <integer>,
+  "suggestions": <integer>
 }
-"""
+
+If the diff is clean, return empty comments array and verdict "approve".
+Never make up file paths or line numbers — only reference what is in the diff."""
 
 
 class LLMService:
     def __init__(self) -> None:
         settings = get_settings()
-        self._client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        self._client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-    def review_pull_request(
+    async def generate_code_review(
         self,
         diff: str,
-        rag_context: str,
-        model: str = "claude-haiku-4-5-20251001",
-        max_tokens: int = 4096,
-    ) -> tuple[dict[str, Any], int]:
-        """Run the PR review. Returns (structured_review_dict, tokens_used)."""
-        user_message = f"""<rag_context>
-{rag_context}
-</rag_context>
-
-<pull_request_diff>
-{diff}
-</pull_request_diff>
-
-Review the pull request diff. Use the RAG context to understand the codebase conventions and
-existing patterns. Return ONLY the JSON object described in the system prompt."""
-
-        message = self._client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            system=REVIEW_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_message}],
+        context_chunks: list[str],
+        pr_title: str,
+        use_sonnet: bool = False,
+    ) -> ReviewResult:
+        """Call Claude and return a structured ReviewResult."""
+        model = SONNET_MODEL if use_sonnet else HAIKU_MODEL
+        joined_chunks = "\n\n---\n\n".join(context_chunks)
+        user_msg = (
+            f"PR Title: {pr_title}\n\n"
+            f"CODEBASE CONTEXT:\n{joined_chunks}\n\n"
+            f"PR DIFF:\n{diff}"
         )
 
-        tokens_used = message.usage.input_tokens + message.usage.output_tokens
-        raw_content = message.content[0].text.strip()  # type: ignore[union-attr]
+        start = time.perf_counter()
+        messages: list[dict[str, str]] = [{"role": "user", "content": user_msg}]
+
+        response = await self._client.messages.create(
+            model=model,
+            max_tokens=4096,
+            system=SYSTEM_PROMPT,
+            messages=messages,
+        )
+
+        tokens_used = response.usage.input_tokens + response.usage.output_tokens
+        raw = response.content[0].text.strip()  # type: ignore[union-attr]
 
         try:
-            structured = json.loads(raw_content)
+            data = json.loads(raw)
         except json.JSONDecodeError:
-            # Attempt to extract JSON from the response if the model added prose
-            start = raw_content.find("{")
-            end = raw_content.rfind("}") + 1
-            structured = json.loads(raw_content[start:end])
+            # Retry once with an explicit JSON-only instruction
+            retry_messages = messages + [
+                {"role": "assistant", "content": raw},
+                {"role": "user", "content": "Respond only with valid JSON, no preamble."},
+            ]
+            response2 = await self._client.messages.create(
+                model=model,
+                max_tokens=4096,
+                system=SYSTEM_PROMPT,
+                messages=retry_messages,
+            )
+            tokens_used += response2.usage.input_tokens + response2.usage.output_tokens
+            raw2 = response2.content[0].text.strip()  # type: ignore[union-attr]
+            data = json.loads(raw2)
+
+        processing_time_ms = int((time.perf_counter() - start) * 1000)
+
+        result = ReviewResult(
+            summary=data.get("summary", ""),
+            verdict=data.get("verdict", "comment"),
+            comments=[ReviewComment(**c) for c in data.get("comments", [])],
+            bugs_found=int(data.get("bugs_found", 0)),
+            security_issues=int(data.get("security_issues", 0)),
+            suggestions=int(data.get("suggestions", 0)),
+            model_used=model,
+            tokens_used=tokens_used,
+            processing_time_ms=processing_time_ms,
+        )
 
         logger.info(
             "LLM review complete",
             model=model,
             tokens_used=tokens_used,
-            comments_count=len(structured.get("comments", [])),
+            processing_time_ms=processing_time_ms,
+            comments=len(result.comments),
+            verdict=result.verdict,
         )
-        return structured, tokens_used
+        return result

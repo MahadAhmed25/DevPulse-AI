@@ -145,6 +145,21 @@ async def post_pr_review(
     return review_id
 
 
+async def get_pull_request(
+    access_token: str, full_name: str, pr_number: int
+) -> dict[str, Any]:
+    """Return a single pull request's metadata."""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.get(
+            f"{BASE_URL}/repos/{full_name}/pulls/{pr_number}",
+            headers=_headers(access_token),
+        )
+    _raise_for_status(response)
+    pr: dict[str, Any] = response.json()
+    logger.info("Fetched pull request", repo=full_name, pr_number=pr_number)
+    return pr
+
+
 async def create_webhook(
     access_token: str, full_name: str, webhook_url: str, secret: str
 ) -> int:
