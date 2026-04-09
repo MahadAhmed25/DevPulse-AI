@@ -11,7 +11,7 @@ from app.models.repository import Repository
 from app.models.review import Review
 from app.models.user import User
 from app.schemas.review import ReviewComment, ReviewResult
-from app.services.review_service import MAX_DIFF_CHARS, ReviewService
+from app.services.review_service import ReviewService
 from app.utils.security import create_access_token, encrypt_token
 
 
@@ -178,7 +178,7 @@ async def test_diff_truncation_at_60k_chars(db_session: AsyncSession) -> None:
     repo = await _make_repo(db_session, user, github_repo_id=8800002, full_name="trunc_user/repo")
     pr = await _make_pr(db_session, repo, pr_number=2)
 
-    oversized_diff = "x" * (MAX_DIFF_CHARS + 10_000)
+    oversized_diff = "x" * 70_000
     received_diffs: list[str] = []
 
     async def _capture(diff: str, **_kwargs: Any) -> ReviewResult:
@@ -218,7 +218,7 @@ async def test_diff_truncation_at_60k_chars(db_session: AsyncSession) -> None:
         )
 
     assert len(received_diffs) == 1
-    assert len(received_diffs[0]) == MAX_DIFF_CHARS
+    assert len(received_diffs[0]) == 60_000
 
 
 # ---------------------------------------------------------------------------
