@@ -1,4 +1,5 @@
 """Phase 4 review pipeline tests."""
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -17,6 +18,7 @@ from app.utils.security import create_access_token, encrypt_token
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 async def _make_user(
     db: AsyncSession,
@@ -38,7 +40,13 @@ async def _make_user(
     return user
 
 
-async def _make_repo(db: AsyncSession, owner: User, *, github_repo_id: int, full_name: str) -> Repository:
+async def _make_repo(
+    db: AsyncSession,
+    owner: User,
+    *,
+    github_repo_id: int,
+    full_name: str,
+) -> Repository:
     repo = Repository(
         owner_id=owner.id,
         github_repo_id=github_repo_id,
@@ -50,7 +58,12 @@ async def _make_repo(db: AsyncSession, owner: User, *, github_repo_id: int, full
     return repo
 
 
-async def _make_pr(db: AsyncSession, repo: Repository, *, pr_number: int = 1) -> PullRequest:
+async def _make_pr(
+    db: AsyncSession,
+    repo: Repository,
+    *,
+    pr_number: int = 1,
+) -> PullRequest:
     pr = PullRequest(
         repository_id=repo.id,
         github_pr_number=pr_number,
@@ -65,8 +78,8 @@ async def _make_pr(db: AsyncSession, repo: Repository, *, pr_number: int = 1) ->
     return pr
 
 
-def _make_review_result(**overrides: object) -> ReviewResult:
-    defaults: dict = {
+def _make_review_result(**overrides: Any) -> ReviewResult:
+    defaults: dict[str, Any] = {
         "summary": "Looks good.",
         "verdict": "approve",
         "comments": [],
@@ -78,7 +91,7 @@ def _make_review_result(**overrides: object) -> ReviewResult:
         "processing_time_ms": 500,
     }
     defaults.update(overrides)
-    return ReviewResult(**defaults)
+    return ReviewResult(**defaults)  # type: ignore[arg-type]
 
 
 def _auth_headers(user: User) -> dict[str, str]:
@@ -88,6 +101,7 @@ def _auth_headers(user: User) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # Test 1 — full pipeline happy path
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_full_pipeline_happy_path(db_session: AsyncSession) -> None:
@@ -118,16 +132,16 @@ async def test_full_pipeline_happy_path(db_session: AsyncSession) -> None:
         mock_gh.get_pr_diff = AsyncMock(return_value="diff content here")
         mock_gh.post_pr_review = AsyncMock(return_value=99001)
 
-        mock_s3 = MagicMock()
+        mock_s3: MagicMock = MagicMock()
         mock_s3.upload_diff.return_value = "diffs/fake-key/diff.txt"
         mock_s3.upload_review.return_value = "reviews/fake-key/review.json"
         mock_s3_class.return_value = mock_s3
 
-        mock_llm = MagicMock()
+        mock_llm: MagicMock = MagicMock()
         mock_llm.generate_code_review = AsyncMock(return_value=fake_result)
         mock_llm_class.return_value = mock_llm
 
-        mock_rag = MagicMock()
+        mock_rag: MagicMock = MagicMock()
         mock_rag.retrieve_context = AsyncMock(return_value=["chunk1", "chunk2"])
         mock_rag_class.return_value = mock_rag
 
@@ -141,27 +155,21 @@ async def test_full_pipeline_happy_path(db_session: AsyncSession) -> None:
             encrypted_token=user.github_access_token or "",
         )
 
-    # Review record saved
     assert review.bugs_count == 1
     assert review.total_comments == 1
     assert review.posted_to_github is True
     assert review.github_review_id == 99001
     assert review.model_used == "claude-haiku-4-5-20251001"
-
-    # PR marked complete
     assert pr.status == "complete"
-
-    # S3 called for diff and review JSON
     mock_s3.upload_diff.assert_called_once()
     mock_s3.upload_review.assert_called_once()
-
-    # GitHub review posted once
     mock_gh.post_pr_review.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
 # Test 2 — diff truncation at 60k chars
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_diff_truncation_at_60k_chars(db_session: AsyncSession) -> None:
@@ -171,10 +179,10 @@ async def test_diff_truncation_at_60k_chars(db_session: AsyncSession) -> None:
     pr = await _make_pr(db_session, repo, pr_number=2)
 
     oversized_diff = "x" * (MAX_DIFF_CHARS + 10_000)
-    received_diff: list[str] = []
+    received_diffs: list[str] = []
 
-    async def _capture_generate(diff: str, **_kwargs: object) -> ReviewResult:
-        received_diff.append(diff)
+    async def _capture(diff: str, **_kwargs: Any) -> ReviewResult:
+        received_diffs.append(diff)
         return _make_review_result()
 
     with (
@@ -192,7 +200,7 @@ async def test_diff_truncation_at_60k_chars(db_session: AsyncSession) -> None:
         mock_s3_class.return_value = mock_s3
 
         mock_llm = MagicMock()
-        mock_llm.generate_code_review = AsyncMock(side_effect=_capture_generate)
+        mock_llm.generate_code_review = AsyncMock(side_effect=_capture)
         mock_llm_class.return_value = mock_llm
 
         mock_rag = MagicMock()
@@ -209,13 +217,14 @@ async def test_diff_truncation_at_60k_chars(db_session: AsyncSession) -> None:
             encrypted_token=user.github_access_token or "",
         )
 
-    assert len(received_diff) == 1
-    assert len(received_diff[0]) == MAX_DIFF_CHARS
+    assert len(received_diffs) == 1
+    assert len(received_diffs[0]) == MAX_DIFF_CHARS
 
 
 # ---------------------------------------------------------------------------
 # Test 3 — PR status set to "failed" on LLM error
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_pr_status_fails_on_llm_error(db_session: AsyncSession) -> None:
@@ -231,6 +240,7 @@ async def test_pr_status_fails_on_llm_error(db_session: AsyncSession) -> None:
         patch("app.services.review_service.RAGService") as mock_rag_class,
     ):
         mock_gh.get_pr_diff = AsyncMock(return_value="some diff")
+
         mock_s3 = MagicMock()
         mock_s3.upload_diff.return_value = "diffs/key"
         mock_s3_class.return_value = mock_s3
@@ -261,9 +271,11 @@ async def test_pr_status_fails_on_llm_error(db_session: AsyncSession) -> None:
 # Test 4 — free tier limit blocks 4th review
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_free_tier_limit_blocks_4th_review(
-    client: AsyncClient, db_session: AsyncSession
+    client: AsyncClient,
+    db_session: AsyncSession,
 ) -> None:
     """POST /repositories/{repo_id}/prs/{pr_number}/review returns 402 after 3 reviews."""
     user = await _make_user(db_session, github_id=40004, username="free_tier_user", tier="free")
@@ -271,7 +283,6 @@ async def test_free_tier_limit_blocks_4th_review(
         db_session, user, github_repo_id=8800004, full_name="free_tier_user/repo"
     )
 
-    # Insert 3 PRs with Review rows (current month timestamps are automatic)
     for i in range(1, 4):
         pr = await _make_pr(db_session, repo, pr_number=i)
         review = Review(
@@ -286,7 +297,6 @@ async def test_free_tier_limit_blocks_4th_review(
         db_session.add(review)
     await db_session.flush()
 
-    # Attempt a 4th review (pr_number=4)
     with patch("app.api.v1.repositories.github_service.get_pull_request") as mock_get_pr:
         mock_get_pr.return_value = {
             "title": "PR 4",

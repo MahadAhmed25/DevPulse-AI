@@ -27,10 +27,10 @@ async def get_review_stats(
     """Aggregate review statistics for the current user."""
     stats_result = await db.execute(
         select(
-            func.count(Review.id).label("total_reviews"),
-            func.coalesce(func.sum(Review.bugs_count), 0).label("total_bugs_found"),
-            func.coalesce(func.sum(Review.security_flags_count), 0).label("total_security_issues"),
-            func.coalesce(func.avg(Review.total_comments), 0.0).label("avg_comments_per_pr"),
+            func.count(Review.id),
+            func.coalesce(func.sum(Review.bugs_count), 0),
+            func.coalesce(func.sum(Review.security_flags_count), 0),
+            func.coalesce(func.avg(Review.total_comments), 0.0),
         )
         .select_from(Review)
         .join(PullRequest, Review.pull_request_id == PullRequest.id)
@@ -38,6 +38,9 @@ async def get_review_stats(
         .where(Repository.owner_id == current_user.id)
     )
     row = stats_result.one()
+    total_reviews, total_bugs_found, total_security_issues, avg_comments_per_pr = (
+        row[0], row[1], row[2], row[3]
+    )
 
     start_of_month = datetime.now(UTC).replace(
         day=1, hour=0, minute=0, second=0, microsecond=0
@@ -56,10 +59,10 @@ async def get_review_stats(
     ).scalar_one()
 
     return {
-        "total_reviews": row.total_reviews,
-        "total_bugs_found": int(row.total_bugs_found),
-        "total_security_issues": int(row.total_security_issues),
-        "avg_comments_per_pr": float(row.avg_comments_per_pr),
+        "total_reviews": int(total_reviews),
+        "total_bugs_found": int(total_bugs_found),
+        "total_security_issues": int(total_security_issues),
+        "avg_comments_per_pr": float(avg_comments_per_pr),
         "reviews_this_month": reviews_this_month,
     }
 

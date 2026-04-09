@@ -1,5 +1,6 @@
 import json
 import time
+from typing import Any
 
 import anthropic
 import structlog
@@ -68,7 +69,7 @@ class LLMService:
         )
 
         start = time.perf_counter()
-        messages: list[dict[str, str]] = [{"role": "user", "content": user_msg}]
+        messages: list[Any] = [{"role": "user", "content": user_msg}]
 
         response = await self._client.messages.create(
             model=model,
