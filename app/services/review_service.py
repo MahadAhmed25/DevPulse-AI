@@ -1,7 +1,8 @@
+from uuid import UUID
+
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
 
 from app.models.pull_request import PullRequest
 from app.models.review import Review

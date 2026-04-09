@@ -1,6 +1,5 @@
 """Phase 4 review pipeline tests."""
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
