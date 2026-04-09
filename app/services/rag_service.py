@@ -4,10 +4,11 @@ from uuid import UUID
 
 import structlog
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from sqlalchemy import delete, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.code_chunk import CodeChunk
+from app.models.repository import Repository
 from app.services import github_service
 from app.services.embedding_service import EmbeddingService
 
@@ -134,9 +135,6 @@ class RAGService:
         await self._db.flush()
 
         # g. Update repository record — caller must have loaded the repo in this session
-        from app.models.repository import Repository
-        from sqlalchemy import select
-
         result = await self._db.execute(
             select(Repository).where(Repository.id == repo_id)
         )

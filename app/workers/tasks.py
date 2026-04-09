@@ -80,6 +80,8 @@ def index_repository(
     try:
         return _run_async(_execute())  # type: ignore[no-any-return, no-untyped-call]
     except Exception as exc:
+        error_str = str(exc)
+
         async def _mark_failed() -> None:
             async with AsyncSessionLocal() as db:
                 result = await db.execute(
@@ -88,9 +90,9 @@ def index_repository(
                 repo = result.scalar_one_or_none()
                 if repo:
                     repo.index_status = "failed"
-                    repo.index_error = str(exc)
+                    repo.index_error = error_str
                     await db.commit()
 
         _run_async(_mark_failed())  # type: ignore[no-untyped-call]
-        logger.error("Indexing task failed", repo_id=repo_id, error=str(exc))
+        logger.error("Indexing task failed", repo_id=repo_id, error=error_str)
         raise self.retry(exc=exc)
