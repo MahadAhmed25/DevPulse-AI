@@ -1,5 +1,5 @@
 """Phase 3 repository API tests."""
-from unittest.mock import AsyncMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -50,7 +50,7 @@ async def test_connect_repo_enqueues_celery_task(
     user = await _make_user(db_session, github_id=30001, username="repo_user_a")
 
     with patch("app.api.v1.repositories.index_repository") as mock_task:
-        mock_task.delay = AsyncMock()
+        mock_task.delay = MagicMock()
         response = await client.post(
             "/api/v1/repositories",
             json={
@@ -152,7 +152,7 @@ async def test_reindex_enqueues_task(
     repo = await _make_repo(db_session, user, github_repo_id=9900006, full_name="reindex_user/repo")
 
     with patch("app.api.v1.repositories.index_repository") as mock_task:
-        mock_task.delay = AsyncMock()
+        mock_task.delay = MagicMock()
         response = await client.post(
             f"/api/v1/repositories/{repo.id}/reindex",
             headers=_auth_headers(user),
