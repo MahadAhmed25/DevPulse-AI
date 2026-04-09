@@ -1,5 +1,6 @@
 import base64
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -35,14 +36,14 @@ class RAGService:
 
     async def _collect_files(
         self, access_token: str, full_name: str, path: str = ""
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Recursively collect all file items from a GitHub repo path."""
         items = await github_service.get_repo_contents(access_token, full_name, path)
         # get_repo_contents may return a single dict for a file path — normalise
         if isinstance(items, dict):
             items = [items]
 
-        files: list[dict] = []
+        files: list[dict[str, Any]] = []
         for item in items:
             item_path: str = item.get("path", "")
             # Skip if any path segment is in SKIP_DIRS
@@ -135,10 +136,10 @@ class RAGService:
         await self._db.flush()
 
         # g. Update repository record — caller must have loaded the repo in this session
-        result = await self._db.execute(
+        repo_result = await self._db.execute(
             select(Repository).where(Repository.id == repo_id)
         )
-        repo = result.scalar_one_or_none()
+        repo = repo_result.scalar_one_or_none()
         if repo is not None:
             repo.is_indexed = True
             repo.index_status = "complete"

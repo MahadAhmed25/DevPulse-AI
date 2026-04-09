@@ -40,12 +40,12 @@ class ReviewService:
 
             # Retrieve RAG context
             rag = RAGService(self._db)
-            context = await rag.retrieve_context(str(repo.id), query=diff[:2000])
+            context_chunks = await rag.retrieve_context(repo.id, query=diff[:2000])
 
             # Run LLM review
             structured_review, tokens_used = self._llm.review_pull_request(
                 diff=diff,
-                rag_context=context,
+                rag_context="\n\n---\n\n".join(context_chunks),
             )
 
             comments = structured_review.get("comments", [])

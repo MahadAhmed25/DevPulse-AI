@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 
 import boto3
 import structlog
@@ -32,7 +33,7 @@ class EmbeddingService:
             isinstance(retry_state.outcome.exception(), ClientError)
             and retry_state.outcome.exception().response["Error"]["Code"] == "ThrottlingException"
         ),
-        before_sleep=before_sleep_log(logger, "warning"),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
     )
     async def embed_text(self, text: str) -> list[float]:
         """Return the embedding vector for a single text string."""

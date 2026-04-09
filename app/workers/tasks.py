@@ -54,8 +54,8 @@ def run_pr_review(self, pr_id: str) -> dict[str, Any]:  # type: ignore[no-untype
     default_retry_delay=60,
 )
 def index_repository(
-    self, repo_id: str, full_name: str, encrypted_token: str
-) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+    self: Any, repo_id: str, full_name: str, encrypted_token: str
+) -> dict[str, Any]:
     """Celery task: fetch and index an entire repository into pgvector via Bedrock embeddings."""
     logger.info("Starting indexing task", repo_id=repo_id)
 
