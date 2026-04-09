@@ -1,32 +1,49 @@
+import asyncio
 import json
 
 import boto3
 import structlog
+from botocore.exceptions import ClientError
+from tenacity import before_sleep_log, retry, stop_after_attempt, wait_exponential
 
 from app.config import get_settings
 
 logger = structlog.get_logger(__name__)
 
-# Titan Embeddings V2 returns 1024-dimensional vectors by default
-EMBEDDING_DIMENSION = 1024
+settings = get_settings()
+EMBEDDING_DIM = 1024
+MODEL_ID = settings.BEDROCK_EMBEDDING_MODEL_ID
 
 
 class EmbeddingService:
     """Generate embeddings via Amazon Bedrock Titan Embeddings V2."""
 
     def __init__(self) -> None:
-        settings = get_settings()
-        self._model_id = settings.BEDROCK_EMBEDDING_MODEL_ID
         self._client = boto3.client(
             "bedrock-runtime",
             region_name=settings.AWS_REGION,
         )
+        self._dev_mode = settings.ENVIRONMENT == "development"
 
-    def embed(self, text: str) -> list[float]:
+    @retry(
+        wait=wait_exponential(min=1, max=16),
+        stop=stop_after_attempt(4),
+        retry=lambda retry_state: (
+            isinstance(retry_state.outcome.exception(), ClientError)
+            and retry_state.outcome.exception().response["Error"]["Code"] == "ThrottlingException"
+        ),
+        before_sleep=before_sleep_log(logger, "warning"),
+    )
+    async def embed_text(self, text: str) -> list[float]:
         """Return the embedding vector for a single text string."""
-        body = json.dumps({"inputText": text})
-        response = self._client.invoke_model(
-            modelId=self._model_id,
+        if self._dev_mode:
+            return [0.0] * EMBEDDING_DIM
+
+        body = json.dumps({"inputText": text, "dimensions": 1024, "normalize": True})
+
+        response = await asyncio.to_thread(
+            self._client.invoke_model,
+            modelId=MODEL_ID,
             body=body,
             contentType="application/json",
             accept="application/json",
@@ -35,8 +52,12 @@ class EmbeddingService:
         embedding: list[float] = result["embedding"]
         return embedding
 
-    def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        """Embed a list of texts. Bedrock Titan does not support batch natively,
-        so we call embed() per item. For large batches consider parallelising
-        with a thread pool executor."""
-        return [self.embed(t) for t in texts]
+    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        """Embed a list of texts with bounded concurrency. Returns in input order."""
+        semaphore = asyncio.Semaphore(10)
+
+        async def _embed_with_sem(text: str) -> list[float]:
+            async with semaphore:
+                return await self.embed_text(text)
+
+        return list(await asyncio.gather(*(_embed_with_sem(t) for t in texts)))

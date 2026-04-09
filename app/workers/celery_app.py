@@ -26,4 +26,5 @@ celery_app.conf.update(
     },
     task_soft_time_limit=300,   # 5 minutes — task gets SoftTimeLimitExceeded
     task_time_limit=360,         # 6 minutes — worker kills the task
+    result_expires=3600,
 )

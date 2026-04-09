@@ -1,10 +1,12 @@
 import asyncio
 from typing import Any
+from uuid import UUID
 
 import structlog
-from github import Github
+from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
+from app.models.repository import Repository
 from app.services.rag_service import RAGService
 from app.services.review_service import ReviewService
 from app.workers.celery_app import celery_app
@@ -51,69 +53,44 @@ def run_pr_review(self, pr_id: str) -> dict[str, Any]:  # type: ignore[no-untype
     max_retries=2,
     default_retry_delay=60,
 )
-def index_repository(self, repo_id: str) -> dict[str, Any]:  # type: ignore[no-untyped-def]
-    """Celery task: clone and index an entire repository into pgvector."""
-    from sqlalchemy import select
-
-    from app.models.repository import Repository
-    from app.models.user import User
-
+def index_repository(
+    self, repo_id: str, full_name: str, encrypted_token: str
+) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+    """Celery task: fetch and index an entire repository into pgvector via Bedrock embeddings."""
     logger.info("Starting indexing task", repo_id=repo_id)
 
     async def _execute() -> dict[str, Any]:
+        from app.utils.security import decrypt_token
+
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(Repository).where(Repository.id == repo_id))
             repo = result.scalar_one_or_none()
             if repo is None:
                 raise ValueError(f"Repository {repo_id} not found")
 
-            owner_result = await db.execute(select(User).where(User.id == repo.owner_id))
-            user = owner_result.scalar_one_or_none()
-            if user is None or not user.github_access_token:
-                raise ValueError(f"No GitHub token for user {repo.owner_id}")
+            repo.index_status = "indexing"
+            await db.flush()
 
-            g = Github(user.github_access_token)
-            github_repo = g.get_repo(repo.full_name)
-
+            access_token = decrypt_token(encrypted_token)
             rag = RAGService(db)
-            await rag.delete_repository_embeddings(repo_id)
-
-            total_chunks = 0
-            # Traverse the default branch tree and index text/code files
-            tree = github_repo.get_git_tree(repo.default_branch, recursive=True)
-            for item in tree.tree:
-                if item.type != "blob":
-                    continue
-                # Skip large files and binary extensions
-                if item.size and item.size > 200_000:
-                    continue
-                ext = item.path.rsplit(".", 1)[-1] if "." in item.path else ""
-                if ext not in {
-                    "py", "ts", "tsx", "js", "jsx", "go", "java", "rb",
-                    "rs", "cpp", "c", "h", "cs", "php", "swift", "kt",
-                    "md", "txt", "yaml", "yml", "toml", "json",
-                }:
-                    continue
-
-                try:
-                    blob = github_repo.get_git_blob(item.sha)
-                    import base64
-                    content = base64.b64decode(blob.content).decode("utf-8", errors="ignore")
-                    n = await rag.index_file(repo_id, item.path, content)
-                    total_chunks += n
-                except Exception as exc:
-                    logger.warning("Skipping file", path=item.path, error=str(exc))
-
-            from datetime import UTC, datetime
-            repo.is_indexed = True
-            repo.last_indexed_at = datetime.now(UTC)
+            await rag.index_repository(UUID(repo_id), full_name, access_token)
             await db.commit()
-
-            logger.info("Indexing complete", repo_id=repo_id, chunks=total_chunks)
-            return {"repo_id": repo_id, "chunks": total_chunks}
+            return {"repo_id": repo_id}
 
     try:
         return _run_async(_execute())  # type: ignore[no-any-return, no-untyped-call]
     except Exception as exc:
+        async def _mark_failed() -> None:
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(
+                    select(Repository).where(Repository.id == repo_id)
+                )
+                repo = result.scalar_one_or_none()
+                if repo:
+                    repo.index_status = "failed"
+                    repo.index_error = str(exc)
+                    await db.commit()
+
+        _run_async(_mark_failed())  # type: ignore[no-untyped-call]
         logger.error("Indexing task failed", repo_id=repo_id, error=str(exc))
         raise self.retry(exc=exc)
