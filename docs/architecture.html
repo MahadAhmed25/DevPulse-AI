@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevPulse AI — Full System Architecture</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    padding: 32px 24px 64px;
+  }
+  h1 { text-align: center; font-size: 1.75rem; font-weight: 700; color: #f0f6fc; margin-bottom: 4px; letter-spacing: -0.5px; }
+  .subtitle { text-align: center; color: #8b949e; font-size: 0.875rem; margin-bottom: 10px; }
+
+  .phase-badge-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 28px; }
+  .phase-badge { font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid; letter-spacing: 0.4px; }
+  .badge-done { color: #059669; border-color: #059669; background: rgba(5,150,105,0.08); }
+  .badge-gap  { color: #d97706; border-color: #d97706; background: rgba(217,119,6,0.08); }
+  .badge-crit { color: #dc2626; border-color: #dc2626; background: rgba(220,38,38,0.08); }
+  .badge-new  { color: #7c3aed; border-color: #7c3aed; background: rgba(124,58,237,0.08); }
+
+  .header-row { display: flex; justify-content: center; align-items: center; position: relative; margin-bottom: 6px; }
+  .copy-btn {
+    position: absolute; right: 0;
+    background: #7c3aed; color: #fff; border: none; border-radius: 8px;
+    padding: 8px 16px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .copy-btn:hover { background: #6d28d9; }
+  .copy-btn:active { transform: scale(0.97); }
+  .copy-btn.copied { background: #059669; }
+
+  section { margin-bottom: 52px; }
+  .section-title { font-size: 1.05rem; font-weight: 700; color: #f0f6fc; margin-bottom: 18px; padding-bottom: 8px; border-bottom: 1px solid #21262d; }
+
+  .diagram-wrap, .flow-wrap { width: 100%; overflow-x: auto; border-radius: 12px; border: 1px solid #21262d; background: #0d1117; }
+  .diagram-wrap svg, .flow-wrap svg { display: block; }
+
+  #tooltip {
+    position: fixed; pointer-events: none;
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 10px 14px; font-size: 0.78rem; color: #c9d1d9;
+    max-width: 310px; line-height: 1.55; z-index: 9999;
+    opacity: 0; transition: opacity 0.15s;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  #tooltip .tip-title { font-weight: 700; color: #f0f6fc; margin-bottom: 4px; font-size: 0.82rem; }
+  #tooltip .tip-sub   { color: #8b949e; font-size: 0.75rem; margin-top: 2px; }
+  #tooltip .tip-gap   { color: #d97706; font-size: 0.75rem; margin-top: 6px; font-weight: 600; }
+  #tooltip .tip-crit  { color: #dc2626; font-size: 0.75rem; margin-top: 6px; font-weight: 600; }
+  #tooltip .tip-new   { color: #7c3aed; font-size: 0.75rem; margin-top: 6px; font-weight: 600; }
+
+  .legend-wrap { border-radius: 12px; border: 1px solid #21262d; overflow: hidden; background: #0d1117; }
+  .legend-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .legend-table th { background: #161b22; color: #8b949e; text-align: left; padding: 10px 16px; font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #21262d; }
+  .legend-table td { padding: 10px 16px; border-bottom: 1px solid #161b22; color: #c9d1d9; vertical-align: top; }
+  .legend-table tr:last-child td { border-bottom: none; }
+  .legend-table tr:hover td { background: #161b22; }
+  .legend-table .comp { color: #f0f6fc; font-weight: 600; }
+  .legend-table .tech { color: #79c0ff; }
+  .legend-table .ver  { color: #8b949e; font-size: 0.8rem; }
+  .s-done { color: #059669; font-size: 0.75rem; font-weight: 700; }
+  .s-gap  { color: #d97706; font-size: 0.75rem; font-weight: 700; }
+  .s-crit { color: #dc2626; font-size: 0.75rem; font-weight: 700; }
+  .s-new  { color: #7c3aed; font-size: 0.75rem; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="header-row">
+  <h1>DevPulse AI — Full System Architecture</h1>
+  <button class="copy-btn" id="copyBtn">Copy Architecture Summary</button>
+</div>
+<p class="subtitle">Phases 0–9 target architecture · Backend (Phases 0–8) + Frontend (Phase 9)</p>
+<div class="phase-badge-row">
+  <span class="phase-badge badge-done">Phases 0–4 ✓</span>
+  <span class="phase-badge badge-done">Phase 5 Webhooks ✓</span>
+  <span class="phase-badge badge-gap">Phase 5 Logging (partial)</span>
+  <span class="phase-badge badge-done">Phase 6 Billing ✓</span>
+  <span class="phase-badge badge-crit">Stripe Async ⚠</span>
+  <span class="phase-badge badge-done">Phase 7 CI ✓</span>
+  <span class="phase-badge badge-crit">OIDC + Deploy ⚠</span>
+  <span class="phase-badge badge-gap">Phase 8 Polish</span>
+  <span class="phase-badge badge-new">Phase 9 Frontend (planned)</span>
+</div>
+
+<!-- ═══════════════════════════════ MAIN ARCHITECTURE -->
+<section>
+  <div class="section-title">Full System Architecture — Phases 0–9</div>
+  <div class="diagram-wrap">
+<svg viewBox="0 0 1500 1160" width="1500" height="1160" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="a-am"  markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#d97706"/></marker>
+  <marker id="a-am-b" markerWidth="9" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="9 0,0 3.5,9 7" fill="#d97706"/></marker>
+  <marker id="a-bl"  markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#2563eb"/></marker>
+  <marker id="a-gr"  markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#059669"/></marker>
+  <marker id="a-pu"  markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#7c3aed"/></marker>
+  <marker id="a-re"  markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#dc2626"/></marker>
+</defs>
+
+<rect width="1500" height="1160" fill="#0d1117"/>
+
+<!-- AWS VPC outer border -->
+<rect x="12" y="248" width="1476" height="900" rx="16" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="8,4" opacity="0.3"/>
+<text x="30" y="268" fill="#7c3aed" font-size="11" font-weight="600" opacity="0.6" font-family="system-ui">AWS VPC (10.0.0.0/16)</text>
+
+<!-- ══════════════════════════════════════════════════════
+     LAYER 0 — Frontend (Vercel)
+══════════════════════════════════════════════════════ -->
+<rect x="12" y="12" width="1476" height="224" rx="14" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.4"/>
+<text x="30" y="30" fill="#7c3aed" font-size="11" font-weight="700" opacity="0.7" font-family="system-ui">LAYER 0 — Frontend (Phase 9) · Vercel CDN · devpulse.ai</text>
+
+<!-- Next.js App (Vercel) -->
+<g class="node" data-tip="nextjs" transform="translate(28,38)">
+  <rect width="480" height="190" rx="10" fill="#0f1923" stroke="#7c3aed" stroke-width="2" class="node-rect"/>
+  <text x="240" y="24" text-anchor="middle" fill="#7c3aed" font-size="13" font-weight="700" font-family="system-ui">Next.js 14 (App Router) — devpulse-ui</text>
+  <line x1="14" y1="32" x2="466" y2="32" stroke="#21262d" stroke-width="1"/>
+  <text x="240" y="48" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">Tailwind CSS · shadcn/ui · TanStack Query · Vercel deploy</text>
+  <text x="14" y="68" fill="#c9d1d9" font-size="11" font-family="system-ui">• /              Landing page · Pricing · Sign in with GitHub</text>
+  <text x="14" y="86" fill="#c9d1d9" font-size="11" font-family="system-ui">• /auth/callback OAuth token receiver → httpOnly cookie</text>
+  <text x="14" y="104" fill="#c9d1d9" font-size="11" font-family="system-ui">• /onboarding   3-step wizard: connect repo + how it works</text>
+  <text x="14" y="122" fill="#c9d1d9" font-size="11" font-family="system-ui">• /dashboard    Stats · recent reviews · connected repos</text>
+  <text x="14" y="140" fill="#c9d1d9" font-size="11" font-family="system-ui">• /repositories Connect · reindex · remove · index status</text>
+  <text x="14" y="158" fill="#c9d1d9" font-size="11" font-family="system-ui">• /reviews      History table · detail view · GitHub links</text>
+  <text x="14" y="176" fill="#c9d1d9" font-size="11" font-family="system-ui">• /billing      Plan · usage bars · Stripe checkout/portal</text>
+</g>
+
+<!-- GitHub OAuth -->
+<g class="node" data-tip="github" transform="translate(548,38)">
+  <rect width="180" height="90" rx="10" fill="#0f1923" stroke="#059669" stroke-width="1.5" class="node-rect"/>
+  <text x="90" y="22" text-anchor="middle" fill="#059669" font-size="10" font-weight="700" font-family="system-ui">EXTERNAL</text>
+  <text x="90" y="40" text-anchor="middle" fill="#f0f6fc" font-size="13" font-weight="700" font-family="system-ui">GitHub</text>
+  <text x="90" y="56" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">OAuth · Webhooks</text>
+  <text x="90" y="72" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">PR inline comments</text>
+</g>
+
+<!-- Stripe -->
+<g class="node" data-tip="stripe" transform="translate(548,148)">
+  <rect width="180" height="80" rx="10" fill="#0f1923" stroke="#059669" stroke-width="1.5" class="node-rect"/>
+  <text x="90" y="22" text-anchor="middle" fill="#059669" font-size="10" font-weight="700" font-family="system-ui">EXTERNAL</text>
+  <text x="90" y="40" text-anchor="middle" fill="#f0f6fc" font-size="13" font-weight="700" font-family="system-ui">Stripe</text>
+  <text x="90" y="56" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">Checkout · Portal</text>
+  <text x="90" y="70" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">Subscription webhooks</text>
+</g>
+
+<!-- User Browser -->
+<g class="node" data-tip="browser" transform="translate(778,68)">
+  <rect width="200" height="80" rx="10" fill="#0f1923" stroke="#059669" stroke-width="1.5" class="node-rect"/>
+  <text x="100" y="22" text-anchor="middle" fill="#059669" font-size="10" font-weight="700" font-family="system-ui">EXTERNAL</text>
+  <text x="100" y="40" text-anchor="middle" fill="#f0f6fc" font-size="13" font-weight="700" font-family="system-ui">User Browser</text>
+  <text x="100" y="56" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">devpulse.ai (Next.js)</text>
+  <text x="100" y="70" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">httpOnly cookie auth</text>
+</g>
+
+<!-- GitHub Actions -->
+<g class="node" data-tip="gha" transform="translate(1030,38)">
+  <rect width="200" height="90" rx="10" fill="#0f1923" stroke="#d97706" stroke-width="1.5" class="node-rect" stroke-dasharray="5,3"/>
+  <text x="100" y="20" text-anchor="middle" fill="#d97706" font-size="10" font-weight="700" font-family="system-ui">CI/CD (CRITICAL)</text>
+  <text x="100" y="38" text-anchor="middle" fill="#f0f6fc" font-size="12" font-weight="700" font-family="system-ui">GitHub Actions</text>
+  <text x="100" y="54" text-anchor="middle" fill="#8b949e" font-size="9" font-family="system-ui">ci.yml: lint + test</text>
+  <text x="100" y="68" text-anchor="middle" fill="#8b949e" font-size="9" font-family="system-ui">deploy.yml: ECR push</text>
+  <text x="100" y="82" text-anchor="middle" fill="#dc2626" font-size="9" font-family="system-ui">deploy job: if:false ⚠</text>
+</g>
+
+<!-- Vercel (UI deploy) -->
+<g class="node" data-tip="vercel" transform="translate(1280,38)">
+  <rect width="200" height="90" rx="10" fill="#0f1923" stroke="#7c3aed" stroke-width="1.5" class="node-rect"/>
+  <text x="100" y="20" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700" font-family="system-ui">PHASE 9</text>
+  <text x="100" y="38" text-anchor="middle" fill="#f0f6fc" font-size="12" font-weight="700" font-family="system-ui">Vercel</text>
+  <text x="100" y="54" text-anchor="middle" fill="#8b949e" font-size="9" font-family="system-ui">Next.js hosting + CDN</text>
+  <text x="100" y="68" text-anchor="middle" fill="#8b949e" font-size="9" font-family="system-ui">Preview deploys per PR</text>
+  <text x="100" y="82" text-anchor="middle" fill="#8b949e" font-size="9" font-family="system-ui">devpulse.ai custom domain</text>
+</g>
+
+<!-- ══════════════════════════════════════════════════════
+     LAYER 1 LABELS
+══════════════════════════════════════════════════════ -->
+<!-- Public subnet label -->
+<rect x="220" y="396" width="1050" height="330" rx="14" fill="none" stroke="#2563eb" stroke-width="1" stroke-dasharray="6,3" opacity="0.28"/>
+<text x="236" y="414" fill="#2563eb" font-size="11" font-weight="600" opacity="0.55" font-family="system-ui">Public Subnet (10.0.1.0/24)</text>
+
+<!-- EC2 box -->
+<rect x="236" y="424" width="1034" height="288" rx="12" fill="#0d1520" stroke="#2563eb" stroke-width="2"/>
+<text x="753" y="448" text-anchor="middle" fill="#2563eb" font-size="13" font-weight="700" font-family="system-ui">AWS EC2 (t2.micro) — api.devpulse.ai</text>
+
+<!-- FastAPI sub-box -->
+<g class="node" data-tip="fastapi" transform="translate(252,458)">
+  <rect width="430" height="238" rx="10" fill="#161b22" stroke="#2563eb" stroke-width="1.5" class="node-rect"/>
+  <text x="215" y="26" text-anchor="middle" fill="#2563eb" font-size="13" font-weight="700" font-family="system-ui">FastAPI Application</text>
+  <line x1="14" y1="34" x2="416" y2="34" stroke="#21262d" stroke-width="1"/>
+  <text x="215" y="50" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">Python 3.11 · SQLAlchemy 2.0 · uvicorn · slowapi</text>
+  <text x="14" y="70" fill="#c9d1d9" font-size="11" font-family="system-ui">• GET  /api/v1/auth/github  (OAuth redirect)</text>
+  <text x="14" y="88" fill="#c9d1d9" font-size="11" font-family="system-ui">• GET  /api/v1/auth/github/callback  (JWT issue)</text>
+  <text x="14" y="106" fill="#c9d1d9" font-size="11" font-family="system-ui">• GET/POST /api/v1/repositories  (+tier gate ⚠)</text>
+  <text x="14" y="124" fill="#c9d1d9" font-size="11" font-family="system-ui">• POST /api/v1/repositories/{id}/prs/{n}/review</text>
+  <text x="14" y="142" fill="#c9d1d9" font-size="11" font-family="system-ui">• GET  /api/v1/reviews  /stats</text>
+  <text x="14" y="160" fill="#c9d1d9" font-size="11" font-family="system-ui">• POST /api/v1/webhooks/github  (HMAC)</text>
+  <text x="14" y="178" fill="#c9d1d9" font-size="11" font-family="system-ui">• POST /api/v1/billing/checkout/{tier}</text>
+  <text x="14" y="196" fill="#c9d1d9" font-size="11" font-family="system-ui">• POST /api/v1/billing/portal  /webhook</text>
+  <text x="14" y="214" fill="#dc2626" font-size="10" font-family="system-ui">• ⚠ GET /api/v1/billing/status  MISSING</text>
+  <text x="14" y="228" fill="#6e7681" font-size="10" font-family="system-ui" font-style="italic">rate limits configured, not applied ⚠</text>
+</g>
+
+<!-- Celery sub-box -->
+<g class="node" data-tip="celery" transform="translate(710,458)">
+  <rect width="546" height="238" rx="10" fill="#161b22" stroke="#2563eb" stroke-width="1.5" class="node-rect"/>
+  <text x="273" y="26" text-anchor="middle" fill="#2563eb" font-size="13" font-weight="700" font-family="system-ui">Celery Worker</text>
+  <line x1="14" y1="34" x2="532" y2="34" stroke="#21262d" stroke-width="1"/>
+  <text x="273" y="50" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">celery[redis]==5.4.0 · Redis Cloud broker · max 3 retries</text>
+  <text x="14" y="74" fill="#c9d1d9" font-size="11" font-family="system-ui">• run_pr_review_task</text>
+  <text x="28" y="90" fill="#6e7681" font-size="10" font-family="system-ui">decrypt token → fetch diff → S3 upload → RAG search</text>
+  <text x="28" y="106" fill="#6e7681" font-size="10" font-family="system-ui">→ Claude API → post GitHub comments → save Review</text>
+  <text x="28" y="122" fill="#6e7681" font-size="10" font-family="system-ui">→ upload review JSON to S3 → set PR complete</text>
+  <text x="14" y="146" fill="#c9d1d9" font-size="11" font-family="system-ui">• index_repository_task</text>
+  <text x="28" y="162" fill="#6e7681" font-size="10" font-family="system-ui">clone repo → LangChain chunk → Bedrock embed</text>
+  <text x="28" y="178" fill="#6e7681" font-size="10" font-family="system-ui">→ store 1024-dim vectors in pgvector</text>
+  <text x="14" y="202" fill="#dc2626" font-size="10" font-family="system-ui">⚠ CloudWatch ReviewCompleted/Failed NOT emitted yet</text>
+  <text x="14" y="218" fill="#6e7681" font-size="10" font-family="system-ui" font-style="italic">Dockerized · same .env.prod as API container</text>
+</g>
+
+<!-- ══════════════════════════════════════════════════════
+     LAYER 2 — AWS Managed Services
+══════════════════════════════════════════════════════ -->
+<rect x="24" y="768" width="620" height="372" rx="14" fill="none" stroke="#7c3aed" stroke-width="1" stroke-dasharray="6,3" opacity="0.28"/>
+<text x="40" y="786" fill="#7c3aed" font-size="11" font-weight="600" opacity="0.55" font-family="system-ui">Private Subnet (10.0.2.0/24) · AWS Managed</text>
+
+<!-- RDS -->
+<g class="node" data-tip="rds" transform="translate(38,796)">
+  <rect width="280" height="128" rx="10" fill="#161b22" stroke="#7c3aed" stroke-width="1.5" class="node-rect"/>
+  <text x="140" y="22" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700" font-family="system-ui">AWS MANAGED</text>
+  <text x="140" y="40" text-anchor="middle" fill="#f0f6fc" font-size="13" font-weight="700" font-family="system-ui">RDS PostgreSQL 16</text>
+  <line x1="12" y1="48" x2="268" y2="48" stroke="#21262d" stroke-width="1"/>
+  <text x="140" y="64" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">db.t3.micro · pgvector extension</text>
+  <text x="14" y="82" fill="#6e7681" font-size="10" font-family="system-ui">• users, repositories, pull_requests</text>
+  <text x="14" y="98" fill="#6e7681" font-size="10" font-family="system-ui">• reviews, code_chunks (1024-dim)</text>
+  <text x="14" y="114" fill="#dc2626" font-size="10" font-family="system-ui">⚠ pool_recycle=3600 missing</text>
+</g>
+
+<!-- S3 -->
+<g class="node" data-tip="s3" transform="translate(338,796)">
+  <rect width="280" height="128" rx="10" fill="#161b22" stroke="#7c3aed" stroke-width="1.5" class="node-rect"/>
+  <text x="140" y="22" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700" font-family="system-ui">AWS MANAGED</text>
+  <text x="140" y="40" text-anchor="middle" fill="#f0f6fc" font-size="13" font-weight="700" font-family="system-ui">Amazon S3</text>
+  <line x1="12" y1="48" x2="268" y2="48" stroke="#21262d" stroke-width="1"/>
+  <text x="140" y="64" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">90-day lifecycle · AES256</text>
+  <text x="14" y="82" fill="#6e7681" font-size="10" font-family="system-ui">• diffs/{'{pr_id}'}/diff.txt</text>
+  <text x="14" y="98" fill="#6e7681" font-size="10" font-family="system-ui">• reviews/{'{review_id}'}/review.json</text>
+</g>
+
+<!-- ECR -->
+<g class="node" data-tip="ecr" transform="translate(38,942)">
+  <rect width="280" height="116" rx="10" fill="#161b22" stroke="#7c3aed" stroke-width="1.5" class="node-rect"/>
+  <text x="140" y="22" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700" font-family="system-ui">AWS MANAGED</text>
+  <text x="140" y="40" text-anchor="middle" fill="#f0f6fc" font-size="13" font-weight="700" font-family="system-ui">Amazon ECR</text>
+  <line x1="12" y1="48" x2="268" y2="48" stroke="#21262d" stroke-width="1"/>
+  <text x="140" y="64" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">devpulse · devpulse-worker</text>
+  <text x="14" y="82" fill="#6e7681" font-size="10" font-family="system-ui">• Lifecycle: last 10 images kept</text>
+  <text x="14" y="98" fill="#dc2626" font-size="10" font-family="system-ui">⚠ EC2 IAM missing ECR pull perms</text>
+</g>
+
+<!-- CloudWatch -->
+<g class="node" data-tip="cloudwatch" transform="translate(338,942)">
+  <rect width="280" height="116" rx="10" fill="#161b22" stroke="#7c3aed" stroke-width="1.5" class="node-rect"/>
+  <text x="140" y="22" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700" font-family="system-ui">AWS MANAGED</text>
+  <text x="140" y="40" text-anchor="middle" fill="#f0f6fc" font-size="13" font-weight="700" font-family="system-ui">AWS CloudWatch</text>
+  <line x1="12" y1="48" x2="268" y2="48" stroke="#21262d" stroke-width="1"/>
+  <text x="140" y="64" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">/devpulse/api · /devpulse/worker</text>
+  <text x="14" y="82" fill="#6e7681" font-size="10" font-family="system-ui">• 30-day retention · SNS alarms</text>
+  <text x="14" y="98" fill="#dc2626" font-size="10" font-family="system-ui">⚠ No watchtower — logs not arriving</text>
+</g>
+
+<!-- IAM summary -->
+<g class="node" data-tip="iam" transform="translate(38,1076)">
+  <rect width="580" height="44" rx="10" fill="#161b22" stroke="#7c3aed" stroke-width="1.5" class="node-rect"/>
+  <text x="290" y="18" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700" font-family="system-ui">AWS IAM</text>
+  <text x="290" y="34" text-anchor="middle" fill="#f0f6fc" font-size="11" font-family="system-ui">EC2 role: S3 · Bedrock · CloudWatch    |    ⚠ ECR pull + GitHub OIDC MISSING</text>
+</g>
+
+<!-- ══════════════════════════════════════════════════════
+     LAYER 3 — External AI + Services
+══════════════════════════════════════════════════════ -->
+<rect x="686" y="768" width="800" height="372" rx="14" fill="none" stroke="#059669" stroke-width="1" stroke-dasharray="6,3" opacity="0.28"/>
+<text x="702" y="786" fill="#059669" font-size="11" font-weight="600" opacity="0.55" font-family="system-ui">External AI + Services</text>
+
+<!-- Claude -->
+<g class="node" data-tip="claude" transform="translate(700,796)">
+  <rect width="240" height="150" rx="10" fill="#161b22" stroke="#059669" stroke-width="1.5" class="node-rect"/>
+  <text x="120" y="20" text-anchor="middle" fill="#059669" font-size="10" font-weight="700" font-family="system-ui">EXTERNAL AI</text>
+  <text x="120" y="38" text-anchor="middle" fill="#f0f6fc" font-size="13" font-weight="700" font-family="system-ui">Anthropic Claude</text>
+  <line x1="12" y1="46" x2="228" y2="46" stroke="#21262d" stroke-width="1"/>
+  <text x="120" y="64" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">Structured PR code review</text>
+  <text x="14" y="84" fill="#6e7681" font-size="10" font-family="system-ui">• claude-haiku-4-5 (free tier)</text>
+  <text x="14" y="100" fill="#6e7681" font-size="10" font-family="system-ui">• claude-sonnet-4-6 (pro/team)</text>
+  <text x="14" y="116" fill="#6e7681" font-size="10" font-family="system-ui">• 4096 max tokens</text>
+  <text x="14" y="132" fill="#6e7681" font-size="10" font-family="system-ui">• JSON retry on parse failure</text>
+</g>
+
+<!-- Bedrock -->
+<g class="node" data-tip="bedrock" transform="translate(960,796)">
+  <rect width="240" height="150" rx="10" fill="#161b22" stroke="#7c3aed" stroke-width="1.5" class="node-rect"/>
+  <text x="120" y="20" text-anchor="middle" fill="#7c3aed" font-size="10" font-weight="700" font-family="system-ui">AWS</text>
+  <text x="120" y="38" text-anchor="middle" fill="#f0f6fc" font-size="13" font-weight="700" font-family="system-ui">Amazon Bedrock</text>
+  <line x1="12" y1="46" x2="228" y2="46" stroke="#21262d" stroke-width="1"/>
+  <text x="120" y="64" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">Titan Embeddings V2</text>
+  <text x="14" y="84" fill="#6e7681" font-size="10" font-family="system-ui">• 1024-dim vectors</text>
+  <text x="14" y="100" fill="#6e7681" font-size="10" font-family="system-ui">• embed_text() / embed_texts()</text>
+  <text x="14" y="116" fill="#6e7681" font-size="10" font-family="system-ui">• tenacity retry</text>
+</g>
+
+<!-- Redis Cloud -->
+<g class="node" data-tip="redis" transform="translate(700,966)">
+  <rect width="500" height="96" rx="10" fill="#161b22" stroke="#059669" stroke-width="1.5" class="node-rect"/>
+  <text x="250" y="20" text-anchor="middle" fill="#059669" font-size="10" font-weight="700" font-family="system-ui">EXTERNAL MANAGED</text>
+  <text x="250" y="38" text-anchor="middle" fill="#f0f6fc" font-size="13" font-weight="700" font-family="system-ui">Redis Cloud</text>
+  <line x1="12" y1="46" x2="488" y2="46" stroke="#21262d" stroke-width="1"/>
+  <text x="250" y="62" text-anchor="middle" fill="#8b949e" font-size="10" font-family="system-ui">Free tier · Celery broker + result backend</text>
+  <text x="14" y="80" fill="#6e7681" font-size="10" font-family="system-ui">• Queues: default (reviews) · indexing</text>
+</g>
+
+<!-- Terraform -->
+<g class="node" data-tip="terraform" transform="translate(700,1080)">
+  <rect width="500" height="40" rx="10" fill="#161b22" stroke="#d97706" stroke-width="1.5" class="node-rect" stroke-dasharray="5,3"/>
+  <text x="250" y="14" text-anchor="middle" fill="#d97706" font-size="10" font-weight="700" font-family="system-ui">IaC (not yet applied)</text>
+  <text x="250" y="30" text-anchor="middle" fill="#f0f6fc" font-size="11" font-family="system-ui">Terraform — VPC · EC2 · RDS · S3 · ECR · CloudWatch · IAM    ⚠ OIDC missing</text>
+</g>
+
+<!-- ══════════════════════════════════════════════════════
+     ARROWS — Frontend layer
+══════════════════════════════════════════════════════ -->
+
+<!-- Browser → Next.js (user visits site) -->
+<path d="M878,108 L878,148 L680,148 L680,130" fill="none" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#a-pu)"/>
+<rect x="740" y="136" width="100" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="790" y="147" text-anchor="middle" fill="#7c3aed" font-size="9" font-family="system-ui" font-weight="600">visits devpulse.ai</text>
+
+<!-- Next.js → FastAPI (API calls with JWT) -->
+<path d="M508,190 L508,382 L460,382 L460,424" fill="none" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#a-pu)"/>
+<rect x="430" y="296" width="126" height="26" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="493" y="307" text-anchor="middle" fill="#7c3aed" font-size="9" font-family="system-ui" font-weight="600">HTTPS REST API</text>
+<text x="493" y="318" text-anchor="middle" fill="#7c3aed" font-size="9" font-family="system-ui">JWT (httpOnly cookie)</text>
+
+<!-- Next.js → GitHub (OAuth init) -->
+<path d="M548,78 L540,78 L540,38 L728,38 L728,83" fill="none" stroke="#059669" stroke-width="1.5" marker-end="url(#a-gr)"/>
+<rect x="548" y="44" width="130" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="613" y="55" text-anchor="middle" fill="#059669" font-size="9" font-family="system-ui" font-weight="600">OAuth login redirect</text>
+
+<!-- FastAPI → Next.js callback (JWT redirect) -->
+<path d="M452,424 L452,200 L508,200" fill="none" stroke="#059669" stroke-width="1.5" marker-end="url(#a-gr)" stroke-dasharray="4,3"/>
+<rect x="344" y="300" width="112" height="26" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="400" y="311" text-anchor="middle" fill="#059669" font-size="9" font-family="system-ui" font-weight="600">redirect with JWT</text>
+<text x="400" y="322" text-anchor="middle" fill="#059669" font-size="9" font-family="system-ui">?token=...&amp;new_user</text>
+
+<!-- Next.js ↔ Stripe (checkout redirect) -->
+<path d="M508,220 L508,250 L638,250 L638,188" fill="none" stroke="#059669" stroke-width="1.5" marker-end="url(#a-gr)"/>
+<rect x="520" y="230" width="110" height="18" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="575" y="242" text-anchor="middle" fill="#059669" font-size="9" font-family="system-ui" font-weight="600">Stripe checkout redirect</text>
+
+<!-- Stripe → FastAPI webhooks -->
+<path d="M638,188 L638,360 L682,360 L682,424" fill="none" stroke="#059669" stroke-width="1.5" marker-end="url(#a-gr)"/>
+<rect x="644" y="276" width="124" height="18" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="706" y="287" text-anchor="middle" fill="#059669" font-size="9" font-family="system-ui" font-weight="600">billing webhooks (⚠ exc)</text>
+
+<!-- ══════════════════════════════════════════════════════
+     ARROWS — Backend internal
+══════════════════════════════════════════════════════ -->
+
+<!-- GitHub → FastAPI webhooks -->
+<path d="M638,83 L638,330 L760,330 L760,424" fill="none" stroke="#059669" stroke-width="1.5" marker-end="url(#a-gr)"/>
+<rect x="648" y="310" width="110" height="18" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="703" y="321" text-anchor="middle" fill="#059669" font-size="9" font-family="system-ui" font-weight="600">PR webhooks (HMAC)</text>
+
+<!-- FastAPI → Celery enqueue -->
+<path d="M682,567 L710,567" fill="none" stroke="#d97706" stroke-width="1.5" marker-end="url(#a-am)"/>
+<rect x="620" y="555" width="88" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="664" y="566" text-anchor="middle" fill="#d97706" font-size="8.5" font-family="system-ui" font-weight="600">enqueue→Redis</text>
+
+<!-- FastAPI → RDS -->
+<path d="M467,696 L467,756 L178,756 L178,796" fill="none" stroke="#d97706" stroke-width="1.5" marker-end="url(#a-am)"/>
+<rect x="270" y="744" width="136" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="338" y="755" text-anchor="middle" fill="#d97706" font-size="9" font-family="system-ui" font-weight="600">read/write users, repos</text>
+
+<!-- Celery → RDS -->
+<path d="M1010,696 L1010,752 L400,752 L400,796" fill="none" stroke="#d97706" stroke-width="1.5" marker-end="url(#a-am)"/>
+<rect x="620" y="742" width="136" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="688" y="753" text-anchor="middle" fill="#d97706" font-size="9" font-family="system-ui" font-weight="600">read/write reviews, chunks</text>
+
+<!-- Celery → S3 -->
+<path d="M1100,696 L1100,762 L490,762 L490,796" fill="none" stroke="#d97706" stroke-width="1.5" marker-end="url(#a-am)"/>
+<rect x="740" y="752" width="130" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="805" y="763" text-anchor="middle" fill="#d97706" font-size="9" font-family="system-ui" font-weight="600">upload diffs + reviews</text>
+
+<!-- Celery → Bedrock -->
+<path d="M1180,696 L1180,774 L1075,774 L1075,796" fill="none" stroke="#d97706" stroke-width="1.5" marker-end="url(#a-am)"/>
+<rect x="1086" y="764" width="82" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="1127" y="775" text-anchor="middle" fill="#d97706" font-size="9" font-family="system-ui" font-weight="600">embed_text()</text>
+
+<!-- Celery → Claude -->
+<path d="M870,696 L870,774 L820,774 L820,796" fill="none" stroke="#d97706" stroke-width="1.5" marker-end="url(#a-am)"/>
+<rect x="826" y="764" width="88" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="870" y="775" text-anchor="middle" fill="#d97706" font-size="9" font-family="system-ui" font-weight="600">generate_review()</text>
+
+<!-- Celery → GitHub (post comments) -->
+<path d="M710,490 L600,490 L600,260 L728,260 L728,128" fill="none" stroke="#d97706" stroke-width="1.5" marker-end="url(#a-am)"/>
+<rect x="616" y="370" width="110" height="18" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="671" y="381" text-anchor="middle" fill="#d97706" font-size="9" font-family="system-ui" font-weight="600">post_pr_review()</text>
+
+<!-- FastAPI ↔ Redis (bidirectional) -->
+<path d="M682,546 L650,546 L650,1012 L700,1012" fill="none" stroke="#d97706" stroke-width="1.5" marker-end="url(#a-am)" marker-start="url(#a-am-b)"/>
+<rect x="586" y="770" width="62" height="26" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="617" y="781" text-anchor="middle" fill="#d97706" font-size="9" font-family="system-ui">Celery</text>
+<text x="617" y="792" text-anchor="middle" fill="#d97706" font-size="9" font-family="system-ui">dispatch</text>
+
+<!-- FastAPI → CloudWatch (dashed, broken) -->
+<path d="M390,696 L390,930" fill="none" stroke="#dc2626" stroke-width="1.5" marker-end="url(#a-re)" stroke-dasharray="5,3"/>
+<rect x="306" y="806" width="84" height="26" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="348" y="817" text-anchor="middle" fill="#dc2626" font-size="9" font-family="system-ui">logs (⚠ no</text>
+<text x="348" y="828" text-anchor="middle" fill="#dc2626" font-size="9" font-family="system-ui">watchtower)</text>
+
+<!-- ECR → EC2 (dashed, broken) -->
+<path d="M178,942 L178,890 L300,890 L300,712" fill="none" stroke="#dc2626" stroke-width="1.5" marker-end="url(#a-re)" stroke-dasharray="5,3"/>
+<rect x="186" y="876" width="114" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="243" y="887" text-anchor="middle" fill="#dc2626" font-size="9" font-family="system-ui" font-weight="600">docker pull ⚠ IAM</text>
+
+<!-- GitHub Actions → ECR -->
+<path d="M1130,83 L1130,900 L318,900 L318,942" fill="none" stroke="#d97706" stroke-width="1.5" marker-end="url(#a-am)" stroke-dasharray="4,3"/>
+<rect x="740" y="890" width="150" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="815" y="901" text-anchor="middle" fill="#d97706" font-size="9" font-family="system-ui" font-weight="600">build + push images (⚠ OIDC)</text>
+
+<!-- Vercel → Next.js deploy -->
+<path d="M1380,83 L1380,160 L508,160 L508,190" fill="none" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#a-pu)" stroke-dasharray="4,3"/>
+<rect x="900" y="150" width="112" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="956" y="161" text-anchor="middle" fill="#7c3aed" font-size="9" font-family="system-ui" font-weight="600">deploy UI to CDN</text>
+
+<!-- ══════════════════════════════════════════════════════
+     LAYER BADGES (right edge)
+══════════════════════════════════════════════════════ -->
+<rect x="1460" y="12" width="30" height="224" rx="5" fill="#161b22" stroke="#7c3aed" stroke-width="1" opacity="0.5"/>
+<text x="1475" y="122" text-anchor="middle" fill="#7c3aed" font-size="9" font-family="system-ui" font-weight="700" writing-mode="tb">LAYER 0 — FRONTEND</text>
+
+<rect x="1460" y="424" width="30" height="288" rx="5" fill="#161b22" stroke="#2563eb" stroke-width="1" opacity="0.5"/>
+<text x="1475" y="566" text-anchor="middle" fill="#2563eb" font-size="9" font-family="system-ui" font-weight="700" writing-mode="tb">LAYER 1 — EC2</text>
+
+<rect x="1460" y="768" width="30" height="372" rx="5" fill="#161b22" stroke="#7c3aed" stroke-width="1" opacity="0.5"/>
+<text x="1475" y="952" text-anchor="middle" fill="#7c3aed" font-size="9" font-family="system-ui" font-weight="700" writing-mode="tb">LAYERS 2 &amp; 3</text>
+
+<!-- ARROW LEGEND -->
+<rect x="1220" y="1068" width="224" height="82" rx="8" fill="#161b22" stroke="#21262d" stroke-width="1"/>
+<text x="1332" y="1084" text-anchor="middle" fill="#8b949e" font-size="10" font-weight="600" font-family="system-ui">ARROW LEGEND</text>
+<line x1="1232" y1="1096" x2="1268" y2="1096" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#a-pu)"/>
+<text x="1276" y="1100" fill="#c9d1d9" font-size="9" font-family="system-ui">Frontend ↔ API</text>
+<line x1="1232" y1="1110" x2="1268" y2="1110" stroke="#059669" stroke-width="1.5" marker-end="url(#a-gr)"/>
+<text x="1276" y="1114" fill="#c9d1d9" font-size="9" font-family="system-ui">External services</text>
+<line x1="1232" y1="1124" x2="1268" y2="1124" stroke="#d97706" stroke-width="1.5" marker-end="url(#a-am)"/>
+<text x="1276" y="1128" fill="#c9d1d9" font-size="9" font-family="system-ui">Data / task flow</text>
+<line x1="1232" y1="1138" x2="1268" y2="1138" stroke="#dc2626" stroke-width="1.5" marker-end="url(#a-re)" stroke-dasharray="4,2"/>
+<text x="1276" y="1142" fill="#c9d1d9" font-size="9" font-family="system-ui">Gap / broken</text>
+</svg>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ USER JOURNEY FLOW -->
+<section>
+  <div class="section-title">User Journey — Sign Up Through First Review</div>
+  <div class="flow-wrap">
+<svg viewBox="0 0 1500 420" width="1500" height="420" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="jfarr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#d97706"/></marker>
+  <marker id="jfarr-p" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#7c3aed"/></marker>
+</defs>
+<rect width="1500" height="420" fill="#0d1117"/>
+<!-- Lane headers -->
+<rect x="0" y="0" width="1500" height="46" fill="#161b22"/>
+<line x1="0" y1="46" x2="1500" y2="46" stroke="#21262d" stroke-width="1"/>
+<text x="83"   y="28" text-anchor="middle" fill="#059669" font-size="11" font-weight="700" font-family="system-ui">User</text>
+<text x="250"  y="28" text-anchor="middle" fill="#7c3aed" font-size="11" font-weight="700" font-family="system-ui">Next.js (Vercel)</text>
+<text x="450"  y="28" text-anchor="middle" fill="#059669" font-size="11" font-weight="700" font-family="system-ui">GitHub OAuth</text>
+<text x="650"  y="28" text-anchor="middle" fill="#2563eb" font-size="11" font-weight="700" font-family="system-ui">FastAPI</text>
+<text x="850"  y="28" text-anchor="middle" fill="#059669" font-size="11" font-weight="700" font-family="system-ui">Stripe</text>
+<text x="1050" y="28" text-anchor="middle" fill="#059669" font-size="11" font-weight="700" font-family="system-ui">Redis Cloud</text>
+<text x="1250" y="28" text-anchor="middle" fill="#2563eb" font-size="11" font-weight="700" font-family="system-ui">Celery Worker</text>
+<text x="1420" y="28" text-anchor="middle" fill="#059669" font-size="11" font-weight="700" font-family="system-ui">GitHub PR</text>
+<!-- Lifelines -->
+<line x1="83"   y1="46" x2="83"   y2="420" stroke="#059669" stroke-width="1" opacity="0.1"/>
+<line x1="250"  y1="46" x2="250"  y2="420" stroke="#7c3aed" stroke-width="1" opacity="0.1"/>
+<line x1="450"  y1="46" x2="450"  y2="420" stroke="#059669" stroke-width="1" opacity="0.1"/>
+<line x1="650"  y1="46" x2="650"  y2="420" stroke="#2563eb" stroke-width="1" opacity="0.1"/>
+<line x1="850"  y1="46" x2="850"  y2="420" stroke="#059669" stroke-width="1" opacity="0.1"/>
+<line x1="1050" y1="46" x2="1050" y2="420" stroke="#059669" stroke-width="1" opacity="0.1"/>
+<line x1="1250" y1="46" x2="1250" y2="420" stroke="#2563eb" stroke-width="1" opacity="0.1"/>
+<line x1="1420" y1="46" x2="1420" y2="420" stroke="#059669" stroke-width="1" opacity="0.1"/>
+<!-- Lane separators -->
+<line x1="166"  y1="46" x2="166"  y2="420" stroke="#21262d" stroke-width="1" stroke-dasharray="3,4" opacity="0.4"/>
+<line x1="350"  y1="46" x2="350"  y2="420" stroke="#21262d" stroke-width="1" stroke-dasharray="3,4" opacity="0.4"/>
+<line x1="550"  y1="46" x2="550"  y2="420" stroke="#21262d" stroke-width="1" stroke-dasharray="3,4" opacity="0.4"/>
+<line x1="750"  y1="46" x2="750"  y2="420" stroke="#21262d" stroke-width="1" stroke-dasharray="3,4" opacity="0.4"/>
+<line x1="950"  y1="46" x2="950"  y2="420" stroke="#21262d" stroke-width="1" stroke-dasharray="3,4" opacity="0.4"/>
+<line x1="1150" y1="46" x2="1150" y2="420" stroke="#21262d" stroke-width="1" stroke-dasharray="3,4" opacity="0.4"/>
+<line x1="1340" y1="46" x2="1340" y2="420" stroke="#21262d" stroke-width="1" stroke-dasharray="3,4" opacity="0.4"/>
+
+<!-- SIGN UP PHASE -->
+<rect x="0" y="52" width="1500" height="14" fill="rgba(124,58,237,0.06)"/>
+<text x="8" y="62" fill="#7c3aed" font-size="9" font-weight="700" font-family="system-ui">SIGN UP</text>
+
+<circle cx="83" cy="80" r="5" fill="#059669"/>
+<line x1="88" y1="80" x2="242" y2="80" stroke="#d97706" stroke-width="1.5" marker-end="url(#jfarr)"/>
+<rect x="100" y="68" width="138" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="169" y="79" text-anchor="middle" fill="#c9d1d9" font-size="9" font-family="system-ui">1. Visit devpulse.ai, click Sign in with GitHub</text>
+
+<circle cx="250" cy="104" r="5" fill="#7c3aed"/>
+<line x1="255" y1="104" x2="442" y2="104" stroke="#d97706" stroke-width="1.5" marker-end="url(#jfarr)"/>
+<rect x="262" y="92" width="176" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="350" y="103" text-anchor="middle" fill="#c9d1d9" font-size="9" font-family="system-ui">2. GET /api/v1/auth/github → redirect to GitHub</text>
+
+<circle cx="450" cy="128" r="5" fill="#059669"/>
+<rect x="366" y="116" width="168" height="16" rx="3" fill="#161b22" stroke="#059669" stroke-width="1"/>
+<text x="450" y="127" text-anchor="middle" fill="#c9d1d9" font-size="9" font-family="system-ui">3. User authorizes DevPulse on GitHub</text>
+
+<circle cx="650" cy="152" r="5" fill="#2563eb"/>
+<line x1="448" y1="152" x2="642" y2="152" stroke="#d97706" stroke-width="1.5" marker-end="url(#jfarr)"/>
+<rect x="460" y="140" width="180" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="550" y="151" text-anchor="middle" fill="#c9d1d9" font-size="9" font-family="system-ui">4. GitHub → /auth/github/callback?code=... → issue JWT</text>
+
+<circle cx="250" cy="176" r="5" fill="#7c3aed"/>
+<line x1="644" y1="176" x2="258" y2="176" stroke="#d97706" stroke-width="1.5" marker-end="url(#jfarr)"/>
+<rect x="380" y="164" width="256" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="508" y="175" text-anchor="middle" fill="#c9d1d9" font-size="9" font-family="system-ui">5. Redirect to /auth/callback?token=JWT&amp;new_user=true → set cookie</text>
+
+<!-- ONBOARDING PHASE -->
+<rect x="0" y="196" width="1500" height="14" fill="rgba(124,58,237,0.06)"/>
+<text x="8" y="206" fill="#7c3aed" font-size="9" font-weight="700" font-family="system-ui">ONBOARDING</text>
+
+<circle cx="250" cy="224" r="5" fill="#7c3aed"/>
+<rect x="168" y="212" width="164" height="16" rx="3" fill="#161b22" stroke="#7c3aed" stroke-width="1"/>
+<text x="250" y="223" text-anchor="middle" fill="#c9d1d9" font-size="9" font-family="system-ui">6. /onboarding — enter owner/repo to connect</text>
+
+<circle cx="650" cy="248" r="5" fill="#2563eb"/>
+<line x1="255" y1="248" x2="642" y2="248" stroke="#d97706" stroke-width="1.5" marker-end="url(#jfarr)"/>
+<rect x="320" y="236" width="322" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="481" y="247" text-anchor="middle" fill="#c9d1d9" font-size="9" font-family="system-ui">7. POST /api/v1/repositories → enqueue index_repository_task</text>
+
+<circle cx="1050" cy="248" r="5" fill="#059669"/>
+<line x1="655" y1="248" x2="1042" y2="248" stroke="#d97706" stroke-width="1.5" marker-end="url(#jfarr)"/>
+<rect x="780" y="236" width="104" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="832" y="247" text-anchor="middle" fill="#c9d1d9" font-size="9" font-family="system-ui">task enqueued</text>
+
+<circle cx="1250" cy="272" r="5" fill="#2563eb"/>
+<line x1="1055" y1="272" x2="1242" y2="272" stroke="#d97706" stroke-width="1.5" marker-end="url(#jfarr)"/>
+<rect x="1064" y="260" width="176" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="1152" y="271" text-anchor="middle" fill="#c9d1d9" font-size="9" font-family="system-ui">8. index_repository_task: chunk + embed → pgvector</text>
+
+<!-- PR REVIEW PHASE -->
+<rect x="0" y="295" width="1500" height="14" fill="rgba(5,150,105,0.05)"/>
+<text x="8" y="305" fill="#059669" font-size="9" font-weight="700" font-family="system-ui">PR OPENED → AUTO REVIEW</text>
+
+<circle cx="1420" cy="322" r="5" fill="#059669"/>
+<line x1="1414" y1="322" x2="664" y2="322" stroke="#d97706" stroke-width="1.5" marker-end="url(#jfarr)"/>
+<rect x="840" y="310" width="248" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="964" y="321" text-anchor="middle" fill="#c9d1d9" font-size="9" font-family="system-ui">9. User opens PR → GitHub webhook → /webhooks/github</text>
+
+<circle cx="1050" cy="346" r="5" fill="#059669"/>
+<line x1="655" y1="346" x2="1042" y2="346" stroke="#d97706" stroke-width="1.5" marker-end="url(#jfarr)"/>
+<rect x="750" y="334" width="180" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="840" y="345" text-anchor="middle" fill="#c9d1d9" font-size="9" font-family="system-ui">10. Enqueue run_pr_review_task</text>
+
+<circle cx="1250" cy="370" r="5" fill="#2563eb"/>
+<line x1="1055" y1="370" x2="1242" y2="370" stroke="#d97706" stroke-width="1.5" marker-end="url(#jfarr)"/>
+<rect x="1058" y="358" width="182" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="1149" y="369" text-anchor="middle" fill="#c9d1d9" font-size="9" font-family="system-ui">11. diff → RAG → Claude → structured review</text>
+
+<circle cx="1420" cy="394" r="5" fill="#059669"/>
+<line x1="1255" y1="394" x2="1414" y2="394" stroke="#d97706" stroke-width="1.5" marker-end="url(#jfarr)"/>
+<rect x="1262" y="382" width="150" height="16" rx="3" fill="#0d1117" opacity="0.9"/>
+<text x="1337" y="393" text-anchor="middle" fill="#c9d1d9" font-size="9" font-family="system-ui">12. Post inline review comments on PR ✓</text>
+</svg>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ TECH STACK LEGEND -->
+<section>
+  <div class="section-title">Full Tech Stack — Phases 0–9</div>
+  <div class="legend-wrap">
+    <table class="legend-table">
+      <thead><tr><th>Component</th><th>Technology</th><th>Version / Detail</th><th>Phase</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="comp">Landing Page</td><td class="tech">Next.js 14 App Router</td><td class="ver">/ route · SSR · Tailwind · shadcn/ui</td><td class="ver">Phase 9</td><td class="s-new">PLANNED</td></tr>
+        <tr><td class="comp">Auth Flow</td><td class="tech">GitHub OAuth → JWT → httpOnly cookie</td><td class="ver">/auth/callback + Next.js API route</td><td class="ver">Phase 9</td><td class="s-new">PLANNED</td></tr>
+        <tr><td class="comp">Dashboard</td><td class="tech">Next.js + TanStack Query</td><td class="ver">Stats · reviews · repos · usage bars</td><td class="ver">Phase 9</td><td class="s-new">PLANNED</td></tr>
+        <tr><td class="comp">UI Hosting</td><td class="tech">Vercel</td><td class="ver">devpulse.ai · CDN · preview deploys</td><td class="ver">Phase 9</td><td class="s-new">PLANNED</td></tr>
+        <tr><td class="comp">FastAPI Backend</td><td class="tech">Python 3.11 + FastAPI</td><td class="ver">async · SQLAlchemy 2.0 · Pydantic v2</td><td class="ver">Phase 0–4</td><td class="s-done">DONE</td></tr>
+        <tr><td class="comp">Database</td><td class="tech">PostgreSQL 16 + pgvector</td><td class="ver">AWS RDS db.t3.micro · pool_recycle missing</td><td class="ver">Phase 1</td><td class="s-gap">GAP</td></tr>
+        <tr><td class="comp">Embeddings</td><td class="tech">Amazon Bedrock Titan V2</td><td class="ver">1024-dim vectors · tenacity retry</td><td class="ver">Phase 3</td><td class="s-done">DONE</td></tr>
+        <tr><td class="comp">LLM</td><td class="tech">Anthropic Claude</td><td class="ver">Haiku (free) / Sonnet (pro) · JSON retry</td><td class="ver">Phase 4</td><td class="s-done">DONE</td></tr>
+        <tr><td class="comp">Task Queue</td><td class="tech">Celery + Redis Cloud</td><td class="ver">celery[redis]==5.4.0 · 3 retries · 2 queues</td><td class="ver">Phase 3</td><td class="s-done">DONE</td></tr>
+        <tr><td class="comp">Object Storage</td><td class="tech">AWS S3</td><td class="ver">90-day lifecycle · AES256</td><td class="ver">Phase 2</td><td class="s-done">DONE</td></tr>
+        <tr><td class="comp">Webhooks</td><td class="tech">FastAPI + HMAC-SHA256</td><td class="ver">ping handler missing · 2/5 tests</td><td class="ver">Phase 5</td><td class="s-gap">GAP</td></tr>
+        <tr><td class="comp">Logging</td><td class="tech">structlog + watchtower</td><td class="ver">stdout only — no watchtower yet</td><td class="ver">Phase 5</td><td class="s-crit">CRITICAL</td></tr>
+        <tr><td class="comp">Billing</td><td class="tech">Stripe SDK v11</td><td class="ver">sync calls in async — blocks event loop</td><td class="ver">Phase 6</td><td class="s-crit">CRITICAL</td></tr>
+        <tr><td class="comp">Billing Status API</td><td class="tech">FastAPI endpoint</td><td class="ver">GET /billing/status — needed by Phase 9 UI</td><td class="ver">Phase 6</td><td class="s-crit">MISSING</td></tr>
+        <tr><td class="comp">Rate Limiting</td><td class="tech">slowapi</td><td class="ver">configured but no @limiter.limit() on routes</td><td class="ver">Phase 8</td><td class="s-gap">GAP</td></tr>
+        <tr><td class="comp">Compute</td><td class="tech">AWS EC2 t2.micro</td><td class="ver">api.devpulse.ai · Dockerized</td><td class="ver">Phase 0.5</td><td class="s-done">DONE</td></tr>
+        <tr><td class="comp">Container Registry</td><td class="tech">Amazon ECR</td><td class="ver">EC2 IAM missing ECR pull permissions</td><td class="ver">Phase 0.5</td><td class="s-crit">CRITICAL</td></tr>
+        <tr><td class="comp">Observability</td><td class="tech">AWS CloudWatch</td><td class="ver">groups provisioned · not receiving logs yet</td><td class="ver">Phase 5</td><td class="s-crit">CRITICAL</td></tr>
+        <tr><td class="comp">IaC</td><td class="tech">Terraform</td><td class="ver">complete · OIDC trust missing · not applied</td><td class="ver">Phase 0.5</td><td class="s-crit">CRITICAL</td></tr>
+        <tr><td class="comp">CI Pipeline</td><td class="tech">GitHub Actions ci.yml</td><td class="ver">passing · no coverage threshold</td><td class="ver">Phase 7</td><td class="s-gap">GAP</td></tr>
+        <tr><td class="comp">CD Pipeline</td><td class="tech">GitHub Actions deploy.yml</td><td class="ver">built · deploy job disabled · static creds</td><td class="ver">Phase 7</td><td class="s-crit">CRITICAL</td></tr>
+        <tr><td class="comp">Makefile</td><td class="tech">GNU Make</td><td class="ver">make dev · test · lint · migrate · deploy</td><td class="ver">Phase 7</td><td class="s-gap">MISSING</td></tr>
+        <tr><td class="comp">Demo Guide</td><td class="tech">DEMO.md</td><td class="ver">ngrok · step-by-step · curl examples</td><td class="ver">Phase 8</td><td class="s-gap">MISSING</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div id="tooltip"><div class="tip-title" id="tip-title"></div><div id="tip-sub" class="tip-sub"></div><div id="tip-body" style="margin-top:4px;font-size:0.78rem;color:#c9d1d9"></div><div id="tip-extra"></div></div>
+
+<script>
+const TIPS = {
+  nextjs: {
+    title: 'Next.js 14 — devpulse-ui (Phase 9)',
+    sub: 'devpulse.ai · Vercel hosting',
+    body: 'The client-facing web application. Handles sign-up via GitHub OAuth, repo management, review history, billing, and account settings. PR review comments still post directly to GitHub — this UI is for onboarding, observability, and management.',
+    extra: 'PLANNED: Separate repo devpulse-ui. Build order: auth → landing → onboarding → dashboard → repos → billing → reviews → settings.',
+    cls: 'tip-new'
+  },
+  browser: {
+    title: 'User Browser',
+    sub: 'Hits devpulse.ai (Next.js on Vercel)',
+    body: 'Authenticates via GitHub OAuth. JWT stored in httpOnly cookie — never exposed to JavaScript. TanStack Query handles all API calls to the FastAPI backend.',
+    extra: '', cls: ''
+  },
+  github: {
+    title: 'GitHub',
+    sub: 'OAuth · Webhooks · PR inline comments',
+    body: 'Three roles: (1) OAuth identity provider for sign-up, (2) source of PR opened webhooks that trigger reviews, (3) destination for inline AI review comments posted by the Celery worker.',
+    extra: '', cls: ''
+  },
+  stripe: {
+    title: 'Stripe',
+    sub: 'Checkout · Billing Portal · Webhooks',
+    body: 'Handles subscription payments. User clicks Upgrade in the UI → Stripe Checkout → payment → webhook fires → user tier updated in DB.',
+    extra: 'CRITICAL: Stripe SDK calls are synchronous inside async methods — blocks the event loop. Must wrap in asyncio.to_thread().',
+    cls: 'tip-crit'
+  },
+  gha: {
+    title: 'GitHub Actions',
+    sub: 'ci.yml + deploy.yml',
+    body: 'CI: ruff lint + mypy + pytest on every push. CD: builds and pushes API + worker Docker images to ECR on main branch merge.',
+    extra: 'CRITICAL: Deploy job has if:false — nothing deploying. Needs OIDC trust in iam.tf. Static AWS credentials currently in use.',
+    cls: 'tip-crit'
+  },
+  vercel: {
+    title: 'Vercel',
+    sub: 'Phase 9 · Next.js hosting',
+    body: 'Zero-config Next.js hosting with CDN edge network. Preview deployments on every PR to devpulse-ui repo. Custom domain: devpulse.ai.',
+    extra: 'PLANNED: Connect devpulse-ui repo to Vercel. Set NEXT_PUBLIC_API_URL=https://api.devpulse.ai.',
+    cls: 'tip-new'
+  },
+  fastapi: {
+    title: 'FastAPI Application',
+    sub: 'api.devpulse.ai · Python 3.11',
+    body: 'Core async REST API. Handles auth, repo management, review retrieval, webhooks, billing, health checks. Runs in Docker on EC2.',
+    extra: 'GAP: GET /billing/status missing (needed by Phase 9 UI). Repo count limit not enforced. Rate limiters not applied to routes.',
+    cls: 'tip-gap'
+  },
+  celery: {
+    title: 'Celery Worker',
+    sub: 'Redis Cloud broker · max 3 retries',
+    body: 'Processes run_pr_review_task (full AI review pipeline) and index_repository_task (RAG indexing). Runs in a separate Docker container on the same EC2 instance.',
+    extra: 'GAP: CloudWatch ReviewCompleted/Failed metrics not emitted yet.',
+    cls: 'tip-gap'
+  },
+  rds: {
+    title: 'AWS RDS PostgreSQL 16',
+    sub: 'db.t3.micro · pgvector extension',
+    body: 'Primary relational store. Five tables: users, repositories, pull_requests, reviews, code_chunks. pgvector stores 1024-dimensional embeddings for cosine similarity RAG search.',
+    extra: 'GAP: pool_recycle=3600 missing from database.py — stale connections after ~1h idle in production.',
+    cls: 'tip-gap'
+  },
+  s3: {
+    title: 'Amazon S3',
+    sub: '90-day lifecycle · AES256',
+    body: 'Artifact storage for raw PR diffs (diffs/{pr_id}/diff.txt) and structured review JSON (reviews/{review_id}/review.json). Public access blocked.',
+    extra: '', cls: ''
+  },
+  ecr: {
+    title: 'Amazon ECR',
+    sub: 'devpulse + devpulse-worker repos',
+    body: 'Private Docker registry. Two repos with lifecycle policies keeping last 10 images. Scan on push enabled. GitHub Actions builds and pushes images on every merge to main.',
+    extra: 'CRITICAL: EC2 IAM role missing ECR pull permissions — docker pull will fail at deploy time.',
+    cls: 'tip-crit'
+  },
+  cloudwatch: {
+    title: 'AWS CloudWatch',
+    sub: '/devpulse/api · /devpulse/worker',
+    body: 'Log groups provisioned by Terraform with 30-day retention. SNS topic and CPU alarm on EC2 instance.',
+    extra: 'CRITICAL: No watchtower handler in logging.py — logs only go to stdout in production, never reach CloudWatch.',
+    cls: 'tip-crit'
+  },
+  iam: {
+    title: 'AWS IAM',
+    sub: 'EC2 role + instance profile',
+    body: 'EC2 role grants S3 read/write on artifacts bucket, Bedrock InvokeModel for Titan, and CloudWatch Logs write.',
+    extra: 'CRITICAL: Missing ECR pull permissions on EC2 role. Missing GitHub Actions OIDC provider and deploy role in iam.tf.',
+    cls: 'tip-crit'
+  },
+  claude: {
+    title: 'Anthropic Claude API',
+    sub: 'Haiku (free) · Sonnet (pro/team)',
+    body: 'Generates structured JSON code reviews from PR diffs + RAG context. 4096 max tokens. Automatic retry with explicit JSON-only prompt on parse failure.',
+    extra: '', cls: ''
+  },
+  bedrock: {
+    title: 'Amazon Bedrock — Titan Embeddings V2',
+    sub: '1024-dimensional vectors',
+    body: 'Converts code chunks (indexing) and PR diff search queries (RAG retrieval) into 1024-dim vectors. Stored in pgvector for cosine similarity search. tenacity retry on throttling.',
+    extra: '', cls: ''
+  },
+  redis: {
+    title: 'Redis Cloud',
+    sub: 'Free tier · Celery broker + backend',
+    body: 'Managed Redis used as Celery message broker and result backend. Two queues: default (PR reviews) and indexing (repo indexing). Task results stored for status polling.',
+    extra: '', cls: ''
+  },
+  terraform: {
+    title: 'Terraform IaC',
+    sub: 'Not yet applied',
+    body: 'Provisions all AWS infrastructure: VPC, subnets, EC2, RDS (private subnet), S3, ECR (2 repos), CloudWatch log groups, IAM roles. Remote state in S3.',
+    extra: 'CRITICAL: GitHub Actions OIDC provider and deploy role not yet in iam.tf. Infrastructure not yet provisioned in AWS.',
+    cls: 'tip-crit'
+  },
+};
+
+const tooltip  = document.getElementById('tooltip');
+const tipTitle = document.getElementById('tip-title');
+const tipSub   = document.getElementById('tip-sub');
+const tipBody  = document.getElementById('tip-body');
+const tipExtra = document.getElementById('tip-extra');
+
+document.querySelectorAll('.node').forEach(node => {
+  const key = node.dataset.tip;
+  if (!key || !TIPS[key]) return;
+  const rect = node.querySelector('.node-rect');
+  node.addEventListener('mouseenter', () => {
+    const t = TIPS[key];
+    tipTitle.textContent = t.title;
+    tipSub.textContent   = t.sub || '';
+    tipBody.textContent  = t.body;
+    tipExtra.textContent = t.extra || '';
+    tipExtra.className   = t.cls || '';
+    tooltip.style.opacity = '1';
+    if (rect) { rect.style.filter = 'brightness(1.25)'; rect.setAttribute('stroke-width','2.5'); }
+  });
+  node.addEventListener('mousemove', e => {
+    let x = e.clientX + 14, y = e.clientY + 14;
+    if (x + 320 > window.innerWidth)  x = e.clientX - 320;
+    if (y + 140 > window.innerHeight) y = e.clientY - 140;
+    tooltip.style.left = x + 'px'; tooltip.style.top = y + 'px';
+  });
+  node.addEventListener('mouseleave', () => {
+    tooltip.style.opacity = '0';
+    if (rect) { rect.style.filter = ''; rect.setAttribute('stroke-width','1.5'); }
+  });
+});
+
+document.getElementById('copyBtn').addEventListener('click', function() {
+  const s = "DevPulse AI \u2014 AI-powered GitHub PR code review SaaS platform. Full stack: Next.js 14 frontend on Vercel (devpulse.ai), Python/FastAPI backend on AWS EC2, PostgreSQL 16 + pgvector on AWS RDS for vector search, Amazon Bedrock (Titan Embeddings V2) for RAG pipeline, Anthropic Claude API (Haiku/Sonnet) for structured reviews, Celery + Redis Cloud for async task processing, AWS S3 for artifact storage, CloudWatch for observability, Stripe for subscription billing (Free/Pro/Team), Terraform IaC, GitHub Actions CI/CD via ECR.";
+  navigator.clipboard.writeText(s).then(() => {
+    this.textContent = 'Copied!'; this.classList.add('copied');
+    setTimeout(() => { this.textContent = 'Copy Architecture Summary'; this.classList.remove('copied'); }, 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = s; ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    this.textContent = 'Copied!'; this.classList.add('copied');
+    setTimeout(() => { this.textContent = 'Copy Architecture Summary'; this.classList.remove('copied'); }, 2000);
+  });
+});
+</script>
+</body>
+</html>
