@@ -2,10 +2,12 @@ from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from slowapi.util import get_remote_address
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.limiter import limiter
 from app.models.pull_request import PullRequest
 from app.models.repository import Repository
 from app.utils.security import verify_github_webhook_signature
@@ -15,6 +17,7 @@ logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 
+@limiter.limit("100/minute", key_func=get_remote_address)
 @router.post("/github")
 async def github_webhook(
     request: Request,

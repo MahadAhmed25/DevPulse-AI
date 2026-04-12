@@ -1,12 +1,14 @@
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
+from slowapi.util import get_remote_address
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.config import get_settings
 from app.database import get_db
+from app.limiter import limiter
 from app.models.user import User
 from app.schemas.user import UserRead
 from app.services import github_service
@@ -27,8 +29,10 @@ async def github_login() -> RedirectResponse:
     return RedirectResponse(f"{GITHUB_AUTHORIZE_URL}?{params}")
 
 
+@limiter.limit("10/minute", key_func=get_remote_address)
 @router.get("/github/callback")
 async def github_callback(
+    request: Request,
     code: str,
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:

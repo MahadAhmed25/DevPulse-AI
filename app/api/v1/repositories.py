@@ -3,12 +3,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_active_user
 from app.database import get_db
+from app.limiter import _user_key_func, limiter
 from app.models.pull_request import PullRequest
 from app.models.repository import Repository
 from app.models.review import Review
@@ -158,8 +159,10 @@ async def reindex_repository(
     return {"message": "Reindex queued", "repo_id": str(repo_id)}
 
 
+@limiter.limit("10/minute", key_func=_user_key_func)
 @router.post("/{repo_id}/prs/{pr_number}/review", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_pr_review(
+    request: Request,
     repo_id: uuid.UUID,
     pr_number: int,
     db: AsyncSession = Depends(get_db),
