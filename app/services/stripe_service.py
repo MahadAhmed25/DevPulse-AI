@@ -99,6 +99,7 @@ class StripeService:
         if user:
             user.stripe_customer_id = customer_id
             user.subscription_tier = tier
+            await db.commit()
             logger.info("Subscription activated", user_id=user_id, tier=tier)
 
     async def _handle_subscription_change(
@@ -116,9 +117,11 @@ class StripeService:
 
         if status in ("canceled", "unpaid", "incomplete_expired"):
             user.subscription_tier = "free"
+            await db.commit()
             logger.info("Subscription downgraded to free", customer_id=customer_id)
         elif status == "active":
             price_id = subscription["items"]["data"][0]["price"]["id"]
             tier = TIER_BY_PRICE.get(price_id, "free")
             user.subscription_tier = tier
+            await db.commit()
             logger.info("Subscription updated", customer_id=customer_id, tier=tier)
