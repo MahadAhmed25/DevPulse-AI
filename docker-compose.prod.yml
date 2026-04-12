@@ -1,5 +1,3 @@
-version: "3.9"
-
 # Production — postgres on RDS, redis in Docker on EC2.
 # All secrets injected via .env.prod. Images pulled from Amazon ECR.
 
