@@ -49,7 +49,7 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Lint with ruff
-        run: ruff check app tests
+        run: ruff check app tests && ruff format --check app tests
 
       - name: Type check with mypy
         run: mypy app
@@ -79,4 +79,4 @@ jobs:
           FRONTEND_URL: http://localhost:3000
           ENVIRONMENT: development
           LOG_LEVEL: INFO
-        run: pytest --cov=app --cov-report=term-missing -v
+        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=70 -v

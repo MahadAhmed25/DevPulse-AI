@@ -41,14 +41,14 @@ resource "aws_security_group" "ec2" {
 
 resource "aws_instance" "app" {
   ami                    = data.aws_ami.amazon_linux_2023.id
-  instance_type          = "t2.micro"
+  instance_type          = "t3.micro"
   key_name               = var.ec2_key_pair_name
   subnet_id              = aws_subnet.public[0].id
   vpc_security_group_ids = [aws_security_group.ec2.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2.name
 
   root_block_device {
-    volume_size = 20
+    volume_size = 30
     volume_type = "gp3"
     encrypted   = true
   }

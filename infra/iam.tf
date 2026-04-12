@@ -58,3 +58,102 @@ resource "aws_iam_instance_profile" "ec2" {
   name = "${var.project_name}-ec2-profile"
   role = aws_iam_role.ec2.name
 }
+
+resource "aws_iam_openid_connect_provider" "github_actions" {
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+}
+
+resource "aws_iam_role" "github_deploy" {
+  name = "${var.project_name}-github-deploy-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.github_actions.arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = "repo:MahadAhmed25/DevPulse-AI:ref:refs/heads/main"
+        }
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "github_deploy_ecr" {
+  name = "${var.project_name}-github-deploy-ecr-policy"
+  role = aws_iam_role.github_deploy.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ECRAuth"
+        Effect = "Allow"
+        Action = ["ecr:GetAuthorizationToken"]
+        Resource = "*"
+      },
+      {
+        Sid    = "ECRPushPull"
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload",
+          "ecr:PutImage"
+        ]
+        # Scoped to devpulse repos only — no wildcard
+        Resource = [
+          "arn:aws:ecr:${var.aws_region}:*:repository/${var.project_name}",
+          "arn:aws:ecr:${var.aws_region}:*:repository/${var.project_name}-worker"
+        ]
+      }
+    ]
+  })
+}
+
+output "github_deploy_role_arn" {
+  description = "ARN to set as AWS_DEPLOY_ROLE_ARN GitHub secret"
+  value       = aws_iam_role.github_deploy.arn
+}
+
+resource "aws_iam_role_policy" "ec2_ecr_pull" {
+  name = "${var.project_name}-ec2-ecr-pull-policy"
+  role = aws_iam_role.ec2.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ECRAuth"
+        Effect = "Allow"
+        Action = ["ecr:GetAuthorizationToken"]
+        Resource = "*"
+      },
+      {
+        Sid    = "ECRPull"
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ]
+        Resource = [
+          "arn:aws:ecr:${var.aws_region}:*:repository/${var.project_name}",
+          "arn:aws:ecr:${var.aws_region}:*:repository/${var.project_name}-worker"
+        ]
+      }
+    ]
+  })
+}

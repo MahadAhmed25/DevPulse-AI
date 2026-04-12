@@ -16,7 +16,7 @@ terraform {
   # interpolation. Create this bucket manually before running terraform init,
   # then pass the name via: terraform init -backend-config="bucket=<your-bucket>"
   backend "s3" {
-    bucket  = "REPLACE-WITH-YOUR-TF-STATE-BUCKET"
+    bucket  = "devpulse-tf-state-mahad"
     key     = "devpulse/terraform.tfstate"
     region  = "us-east-1"
     encrypt = true
