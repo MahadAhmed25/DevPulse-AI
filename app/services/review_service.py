@@ -124,9 +124,7 @@ class ReviewService:
                 bugs_count=review_result.bugs_found,
                 suggestions_count=review_result.suggestions,
                 security_flags_count=review_result.security_issues,
-                style_issues_count=sum(
-                    1 for c in review_result.comments if c.severity == "style"
-                ),
+                style_issues_count=sum(1 for c in review_result.comments if c.severity == "style"),
                 tokens_used=review_result.tokens_used,
                 processing_time_ms=review_result.processing_time_ms,
                 posted_to_github=True,

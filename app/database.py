@@ -25,7 +25,7 @@ def build_engine() -> AsyncEngine:
         pool_size=10,
         max_overflow=20,
         pool_pre_ping=True,  # recycles stale connections
-        pool_recycle=3600,   # prevent RDS idle connection drops (~1 hr timeout)
+        pool_recycle=3600,  # prevent RDS idle connection drops (~1 hr timeout)
     )
 
 

@@ -29,13 +29,9 @@ def _headers(access_token: str) -> dict[str, str]:
 
 def _raise_for_status(response: httpx.Response) -> None:
     if response.status_code == 403 and response.headers.get("X-RateLimit-Remaining") == "0":
-        raise GitHubRateLimitError(
-            f"GitHub rate limit exceeded: {response.text}"
-        )
+        raise GitHubRateLimitError(f"GitHub rate limit exceeded: {response.text}")
     if response.is_error:
-        raise GitHubAPIError(
-            f"GitHub API error {response.status_code}: {response.text}"
-        )
+        raise GitHubAPIError(f"GitHub API error {response.status_code}: {response.text}")
 
 
 async def exchange_code_for_token(code: str) -> str:
@@ -145,9 +141,7 @@ async def post_pr_review(
     return review_id
 
 
-async def get_pull_request(
-    access_token: str, full_name: str, pr_number: int
-) -> dict[str, Any]:
+async def get_pull_request(access_token: str, full_name: str, pr_number: int) -> dict[str, Any]:
     """Return a single pull request's metadata."""
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.get(
@@ -160,9 +154,7 @@ async def get_pull_request(
     return pr
 
 
-async def create_webhook(
-    access_token: str, full_name: str, webhook_url: str, secret: str
-) -> int:
+async def create_webhook(access_token: str, full_name: str, webhook_url: str, secret: str) -> int:
     """Register a pull_request webhook on the repo. Returns the hook ID."""
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(

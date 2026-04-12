@@ -37,9 +37,7 @@ def run_pr_review(self: Any, pr_id: str) -> dict[str, Any]:
         from app.models.user import User
 
         async with AsyncSessionLocal() as db:
-            pr_result = await db.execute(
-                select(PullRequest).where(PullRequest.id == pr_id)
-            )
+            pr_result = await db.execute(select(PullRequest).where(PullRequest.id == pr_id))
             pr = pr_result.scalar_one_or_none()
             if pr is None:
                 raise ValueError(f"PullRequest {pr_id} not found")
@@ -51,9 +49,7 @@ def run_pr_review(self: Any, pr_id: str) -> dict[str, Any]:
             if repo is None:
                 raise ValueError(f"Repository {pr.repository_id} not found")
 
-            user_result = await db.execute(
-                select(User).where(User.id == repo.owner_id)
-            )
+            user_result = await db.execute(select(User).where(User.id == repo.owner_id))
             user = user_result.scalar_one_or_none()
             if user is None or not user.github_access_token:
                 raise ValueError(f"User {repo.owner_id} not found or missing token")
@@ -119,9 +115,7 @@ def index_repository(
 
         async def _mark_failed() -> None:
             async with AsyncSessionLocal() as db:
-                result = await db.execute(
-                    select(Repository).where(Repository.id == repo_id)
-                )
+                result = await db.execute(select(Repository).where(Repository.id == repo_id))
                 repo = result.scalar_one_or_none()
                 if repo:
                     repo.index_status = "failed"

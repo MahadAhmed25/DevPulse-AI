@@ -50,9 +50,7 @@ async def github_webhook(
     base_branch: str = payload["pull_request"]["base"]["ref"]
     head_branch: str = payload["pull_request"]["head"]["ref"]
 
-    result = await db.execute(
-        select(Repository).where(Repository.github_repo_id == github_repo_id)
-    )
+    result = await db.execute(select(Repository).where(Repository.github_repo_id == github_repo_id))
     repo = result.scalar_one_or_none()
     if repo is None:
         logger.info("Webhook for unregistered repo", github_repo_id=github_repo_id)

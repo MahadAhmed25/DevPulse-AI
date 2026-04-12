@@ -1,4 +1,5 @@
 """Phase 3 repository API tests."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -29,7 +30,9 @@ async def _make_user(db: AsyncSession, *, github_id: int, username: str) -> User
     return user
 
 
-async def _make_repo(db: AsyncSession, owner: User, *, github_repo_id: int, full_name: str) -> Repository:
+async def _make_repo(
+    db: AsyncSession, owner: User, *, github_repo_id: int, full_name: str
+) -> Repository:
     repo = Repository(
         owner_id=owner.id,
         github_repo_id=github_repo_id,
@@ -98,11 +101,11 @@ async def test_get_repo_detail_returns_correct_fields(
 ) -> None:
     """GET /repositories/{repo_id} returns 200 with index_status present."""
     user = await _make_user(db_session, github_id=30004, username="detail_user_a")
-    repo = await _make_repo(db_session, user, github_repo_id=9900004, full_name="detail_user_a/repo")
-
-    response = await client.get(
-        f"/api/v1/repositories/{repo.id}", headers=_auth_headers(user)
+    repo = await _make_repo(
+        db_session, user, github_repo_id=9900004, full_name="detail_user_a/repo"
     )
+
+    response = await client.get(f"/api/v1/repositories/{repo.id}", headers=_auth_headers(user))
 
     assert response.status_code == 200
     data = response.json()
@@ -118,11 +121,11 @@ async def test_get_repo_detail_404_for_other_user(
     """GET /repositories/{repo_id} returns 404 when the repo belongs to another user."""
     user_a = await _make_user(db_session, github_id=30005, username="owner_404_a")
     user_b = await _make_user(db_session, github_id=30006, username="requester_404_b")
-    repo_b = await _make_repo(db_session, user_b, github_repo_id=9900005, full_name="owner_404_b/secret")
-
-    response = await client.get(
-        f"/api/v1/repositories/{repo_b.id}", headers=_auth_headers(user_a)
+    repo_b = await _make_repo(
+        db_session, user_b, github_repo_id=9900005, full_name="owner_404_b/secret"
     )
+
+    response = await client.get(f"/api/v1/repositories/{repo_b.id}", headers=_auth_headers(user_a))
 
     assert response.status_code == 404
 
@@ -144,9 +147,7 @@ async def test_embedding_dev_mock_returns_correct_dimension() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reindex_enqueues_task(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_reindex_enqueues_task(client: AsyncClient, db_session: AsyncSession) -> None:
     """POST /repositories/{repo_id}/reindex returns 202 and enqueues Celery task."""
     user = await _make_user(db_session, github_id=30007, username="reindex_user")
     repo = await _make_repo(db_session, user, github_repo_id=9900006, full_name="reindex_user/repo")

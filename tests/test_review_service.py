@@ -1,4 +1,5 @@
 """Phase 4 review pipeline tests."""
+
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -106,7 +107,9 @@ def _auth_headers(user: User) -> dict[str, str]:
 async def test_full_pipeline_happy_path(db_session: AsyncSession) -> None:
     """Full pipeline: diff fetched, S3 uploads x2, GitHub post x1, Review saved."""
     user = await _make_user(db_session, github_id=40001, username="pipeline_user")
-    repo = await _make_repo(db_session, user, github_repo_id=8800001, full_name="pipeline_user/repo")
+    repo = await _make_repo(
+        db_session, user, github_repo_id=8800001, full_name="pipeline_user/repo"
+    )
     pr = await _make_pr(db_session, repo)
 
     fake_result = _make_review_result(

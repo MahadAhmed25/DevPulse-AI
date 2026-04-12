@@ -39,12 +39,13 @@ async def get_review_stats(
     )
     row = stats_result.one()
     total_reviews, total_bugs_found, total_security_issues, avg_comments_per_pr = (
-        row[0], row[1], row[2], row[3]
+        row[0],
+        row[1],
+        row[2],
+        row[3],
     )
 
-    start_of_month = datetime.now(UTC).replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0
-    )
+    start_of_month = datetime.now(UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     reviews_this_month = (
         await db.execute(
             select(func.count(Review.id))
@@ -95,8 +96,10 @@ async def list_reviews(
 
     total = (await db.execute(count_query)).scalar_one()
     reviews = (
-        await db.execute(query.offset(skip).limit(limit).order_by(Review.created_at.desc()))
-    ).scalars().all()
+        (await db.execute(query.offset(skip).limit(limit).order_by(Review.created_at.desc())))
+        .scalars()
+        .all()
+    )
 
     return ReviewList(items=list(reviews), total=total)  # type: ignore[arg-type]
 

@@ -63,9 +63,7 @@ async def add_repository(
     repo_limit = _REPO_LIMITS.get(current_user.subscription_tier)
     if repo_limit is not None:
         current_count = (
-            await db.execute(
-                select(func.count()).where(Repository.owner_id == current_user.id)
-            )
+            await db.execute(select(func.count()).where(Repository.owner_id == current_user.id))
         ).scalar_one()
         if current_count >= repo_limit:
             raise HTTPException(
@@ -92,10 +90,10 @@ async def add_repository(
     db.add(repo)
     await db.flush()
 
-    index_repository.delay(
-        str(repo.id), repo.full_name, current_user.github_access_token
+    index_repository.delay(str(repo.id), repo.full_name, current_user.github_access_token)
+    logger.info(
+        "Repository added and indexing enqueued", repo_id=str(repo.id), full_name=repo.full_name
     )
-    logger.info("Repository added and indexing enqueued", repo_id=str(repo.id), full_name=repo.full_name)
     return repo
 
 
@@ -106,9 +104,7 @@ async def get_repository(
     current_user: User = Depends(get_current_active_user),
 ) -> Repository:
     result = await db.execute(
-        select(Repository).where(
-            Repository.id == repo_id, Repository.owner_id == current_user.id
-        )
+        select(Repository).where(Repository.id == repo_id, Repository.owner_id == current_user.id)
     )
     repo = result.scalar_one_or_none()
     if repo is None:
@@ -123,9 +119,7 @@ async def remove_repository(
     current_user: User = Depends(get_current_active_user),
 ) -> None:
     result = await db.execute(
-        select(Repository).where(
-            Repository.id == repo_id, Repository.owner_id == current_user.id
-        )
+        select(Repository).where(Repository.id == repo_id, Repository.owner_id == current_user.id)
     )
     repo = result.scalar_one_or_none()
     if repo is None:
@@ -150,9 +144,7 @@ async def reindex_repository(
     current_user: User = Depends(get_current_active_user),
 ) -> dict[str, Any]:
     result = await db.execute(
-        select(Repository).where(
-            Repository.id == repo_id, Repository.owner_id == current_user.id
-        )
+        select(Repository).where(Repository.id == repo_id, Repository.owner_id == current_user.id)
     )
     repo = result.scalar_one_or_none()
     if repo is None:
@@ -161,9 +153,7 @@ async def reindex_repository(
     repo.index_status = "indexing"
     await db.flush()
 
-    index_repository.delay(
-        str(repo.id), repo.full_name, current_user.github_access_token
-    )
+    index_repository.delay(str(repo.id), repo.full_name, current_user.github_access_token)
     logger.info("Reindex queued", repo_id=str(repo_id))
     return {"message": "Reindex queued", "repo_id": str(repo_id)}
 
@@ -177,9 +167,7 @@ async def trigger_pr_review(
 ) -> dict[str, Any]:
     """Manually trigger an AI review for a specific PR."""
     repo_result = await db.execute(
-        select(Repository).where(
-            Repository.id == repo_id, Repository.owner_id == current_user.id
-        )
+        select(Repository).where(Repository.id == repo_id, Repository.owner_id == current_user.id)
     )
     repo = repo_result.scalar_one_or_none()
     if repo is None:
@@ -187,9 +175,7 @@ async def trigger_pr_review(
 
     # Free tier monthly limit check
     if current_user.subscription_tier == "free":
-        start_of_month = datetime.now(UTC).replace(
-            day=1, hour=0, minute=0, second=0, microsecond=0
-        )
+        start_of_month = datetime.now(UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         reviews_this_month = (
             await db.execute(
                 select(func.count(Review.id))

@@ -83,9 +83,7 @@ class StripeService:
         elif event_type in ("customer.subscription.updated", "customer.subscription.deleted"):
             await self._handle_subscription_change(event["data"]["object"], db)
 
-    async def _handle_checkout_completed(
-        self, session: dict[str, Any], db: AsyncSession
-    ) -> None:
+    async def _handle_checkout_completed(self, session: dict[str, Any], db: AsyncSession) -> None:
         user_id: str = session["metadata"]["user_id"]
         customer_id: str = session["customer"]
         subscription_id: str = session["subscription"]
@@ -108,9 +106,7 @@ class StripeService:
         customer_id: str = subscription["customer"]
         status: str = subscription["status"]
 
-        result = await db.execute(
-            select(User).where(User.stripe_customer_id == customer_id)
-        )
+        result = await db.execute(select(User).where(User.stripe_customer_id == customer_id))
         user = result.scalar_one_or_none()
         if not user:
             return

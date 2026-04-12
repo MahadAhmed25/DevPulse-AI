@@ -15,6 +15,7 @@ class ReviewComment(BaseModel):
 
 class ReviewResult(BaseModel):
     """Structured output from the LLM — internal use only, not the API response schema."""
+
     summary: str
     verdict: str  # approve | request_changes | comment
     comments: list[ReviewComment]

@@ -17,9 +17,20 @@ logger = structlog.get_logger(__name__)
 
 SKIP_DIRS = {".git", "node_modules", "__pycache__", "dist", "build", ".next", "vendor"}
 SKIP_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".ico", ".svg", ".gif",
-    ".woff", ".woff2", ".ttf", ".pdf", ".zip",
-    ".lock", ".map", ".min.js",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".ico",
+    ".svg",
+    ".gif",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".pdf",
+    ".zip",
+    ".lock",
+    ".map",
+    ".min.js",
 }
 MAX_FILE_BYTES = 100_000
 
@@ -50,16 +61,12 @@ class RAGService:
             if any(part in SKIP_DIRS for part in item_path.split("/")):
                 continue
             if item.get("type") == "dir":
-                files.extend(
-                    await self._collect_files(access_token, full_name, item_path)
-                )
+                files.extend(await self._collect_files(access_token, full_name, item_path))
             elif item.get("type") == "file":
                 files.append(item)
         return files
 
-    async def index_repository(
-        self, repo_id: UUID, full_name: str, access_token: str
-    ) -> None:
+    async def index_repository(self, repo_id: UUID, full_name: str, access_token: str) -> None:
         """Fetch, chunk, embed, and store all code from a GitHub repository."""
         # a. Collect all file paths recursively
         all_file_items = await self._collect_files(access_token, full_name)
@@ -78,9 +85,7 @@ class RAGService:
 
             # Fetch file content (returns single dict with base64 content)
             try:
-                result = await github_service.get_repo_contents(
-                    access_token, full_name, file_path
-                )
+                result = await github_service.get_repo_contents(access_token, full_name, file_path)
                 item = result if isinstance(result, dict) else result[0]
             except Exception as exc:
                 logger.warning("Skipping file (fetch error)", path=file_path, error=str(exc))
@@ -95,9 +100,9 @@ class RAGService:
                 continue
 
             try:
-                content = base64.b64decode(
-                    raw_content.replace("\n", "")
-                ).decode("utf-8", errors="ignore")
+                content = base64.b64decode(raw_content.replace("\n", "")).decode(
+                    "utf-8", errors="ignore"
+                )
             except Exception as exc:
                 logger.warning("Skipping file (decode error)", path=file_path, error=str(exc))
                 continue
@@ -117,9 +122,7 @@ class RAGService:
         embeddings = await self._embedder.embed_texts([t for _, _, t in all_chunks])
 
         # e. Delete existing chunks for this repo
-        await self._db.execute(
-            delete(CodeChunk).where(CodeChunk.repository_id == repo_id)
-        )
+        await self._db.execute(delete(CodeChunk).where(CodeChunk.repository_id == repo_id))
 
         # f. Bulk insert new CodeChunk rows
         chunk_objects = [
@@ -136,9 +139,7 @@ class RAGService:
         await self._db.flush()
 
         # g. Update repository record — caller must have loaded the repo in this session
-        repo_result = await self._db.execute(
-            select(Repository).where(Repository.id == repo_id)
-        )
+        repo_result = await self._db.execute(select(Repository).where(Repository.id == repo_id))
         repo = repo_result.scalar_one_or_none()
         if repo is not None:
             repo.is_indexed = True

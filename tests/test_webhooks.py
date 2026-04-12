@@ -60,6 +60,7 @@ async def test_webhook_rejects_invalid_signature(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_webhook_ignores_non_pr_events(client: AsyncClient) -> None:
     from app.config import get_settings
+
     settings = get_settings()
 
     payload = json.dumps({"action": "opened"}).encode()
@@ -81,6 +82,7 @@ async def test_webhook_ignores_non_pr_events(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_webhook_ping_returns_pong(client: AsyncClient) -> None:
     from app.config import get_settings
+
     settings = get_settings()
 
     payload = json.dumps({"zen": "Keep it logically awesome."}).encode()
@@ -104,22 +106,25 @@ async def test_webhook_valid_pr_event_queues_task(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
     from app.config import get_settings
+
     settings = get_settings()
 
     user = await _make_user(db_session, github_id=50001, username="wh_pr_user")
     repo = await _make_repo(db_session, user, github_repo_id=88001)
 
-    payload = json.dumps({
-        "action": "opened",
-        "repository": {"id": repo.github_repo_id},
-        "pull_request": {
-            "number": 42,
-            "title": "Add feature X",
-            "user": {"login": "wh_pr_user"},
-            "base": {"ref": "main"},
-            "head": {"ref": "feature/x"},
-        },
-    }).encode()
+    payload = json.dumps(
+        {
+            "action": "opened",
+            "repository": {"id": repo.github_repo_id},
+            "pull_request": {
+                "number": 42,
+                "title": "Add feature X",
+                "user": {"login": "wh_pr_user"},
+                "base": {"ref": "main"},
+                "head": {"ref": "feature/x"},
+            },
+        }
+    ).encode()
     sig = _sign_payload(payload, settings.GITHUB_WEBHOOK_SECRET)
 
     with patch("app.api.v1.webhooks.run_pr_review") as mock_task:
@@ -144,19 +149,22 @@ async def test_webhook_valid_pr_event_queues_task(
 @pytest.mark.asyncio
 async def test_webhook_unregistered_repo_returns_200(client: AsyncClient) -> None:
     from app.config import get_settings
+
     settings = get_settings()
 
-    payload = json.dumps({
-        "action": "opened",
-        "repository": {"id": 99999999},
-        "pull_request": {
-            "number": 1,
-            "title": "Test PR",
-            "user": {"login": "testuser"},
-            "base": {"ref": "main"},
-            "head": {"ref": "feature/test"},
-        },
-    }).encode()
+    payload = json.dumps(
+        {
+            "action": "opened",
+            "repository": {"id": 99999999},
+            "pull_request": {
+                "number": 1,
+                "title": "Test PR",
+                "user": {"login": "testuser"},
+                "base": {"ref": "main"},
+                "head": {"ref": "feature/test"},
+            },
+        }
+    ).encode()
     sig = _sign_payload(payload, settings.GITHUB_WEBHOOK_SECRET)
 
     response = await client.post(

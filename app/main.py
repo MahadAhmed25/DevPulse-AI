@@ -64,7 +64,9 @@ app.include_router(api_router, prefix="/api/v1")
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     errors = [
         {"field": ".".join(str(loc) for loc in err["loc"]), "message": err["msg"]}
         for err in exc.errors()

@@ -4,6 +4,7 @@ Note: FastAPI's HTTPBearer raises HTTP 403 (not 401) when the Authorization
 header is absent entirely. test_get_me_without_token_returns_401 therefore
 asserts 403 — the name reflects intent, the assertion reflects reality.
 """
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession

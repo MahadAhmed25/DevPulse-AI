@@ -72,14 +72,16 @@ async def stripe_webhook(
     try:
         await stripe_service.handle_webhook(payload, sig_header, db)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe signature")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe signature"
+        )
     return {"status": "ok"}
 
 
 _TIER_LIMITS: dict[str, dict[str, int | None]] = {
-    "free":  {"review_limit": 3,    "repo_limit": 1},
-    "pro":   {"review_limit": None, "repo_limit": 5},
-    "team":  {"review_limit": None, "repo_limit": None},
+    "free": {"review_limit": 3, "repo_limit": 1},
+    "pro": {"review_limit": None, "repo_limit": 5},
+    "team": {"review_limit": None, "repo_limit": None},
 }
 
 
@@ -108,9 +110,7 @@ async def billing_status(
     ).scalar_one()
 
     repo_count = (
-        await db.execute(
-            select(func.count()).where(Repository.owner_id == current_user.id)
-        )
+        await db.execute(select(func.count()).where(Repository.owner_id == current_user.id))
     ).scalar_one()
 
     return {
