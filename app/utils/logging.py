@@ -68,10 +68,13 @@ def configure_logging(log_level: str = "INFO") -> None:
     handlers: list[logging.Handler] = [handler]
 
     if settings.is_production:
+        import boto3
         import watchtower
 
+        boto3_client = boto3.client("logs", region_name=settings.AWS_REGION)
         cw_handler = watchtower.CloudWatchLogHandler(
             log_group_name=settings.CLOUDWATCH_LOG_GROUP,
+            boto3_client=boto3_client,
         )
         cw_handler.setFormatter(formatter)
         handlers.append(cw_handler)
