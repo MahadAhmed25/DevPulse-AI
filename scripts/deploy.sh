@@ -34,11 +34,12 @@ echo "[deploy] Restarting containers..."
 docker-compose -f docker-compose.prod.yml up -d --no-deps --remove-orphans redis api worker
 
 echo "[deploy] Running database migrations..."
-sleep 5
+sleep 15
 docker-compose -f docker-compose.prod.yml exec -T api alembic upgrade head
 
 echo "[deploy] Health check..."
-curl -sf http://localhost:8000/api/v1/health || { echo "[deploy] Health check failed!"; exit 1; }
+curl --retry 10 --retry-delay 3 --retry-connrefused -sf \
+  http://localhost:8000/api/v1/health || { echo "[deploy] Health check failed!"; exit 1; }
 
 echo "[deploy] Pruning old images..."
 docker image prune -f
