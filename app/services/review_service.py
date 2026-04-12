@@ -1,9 +1,11 @@
 from uuid import UUID
 
+import boto3
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.models.pull_request import PullRequest
 from app.models.review import Review
 from app.services import github_service
@@ -13,6 +15,7 @@ from app.services.s3_service import S3Service
 from app.utils.security import decrypt_token
 
 logger = structlog.get_logger(__name__)
+settings = get_settings()
 
 MAX_DIFF_CHARS = 60_000
 
@@ -148,10 +151,48 @@ class ReviewService:
                 comments=len(review_result.comments),
                 tokens=review_result.tokens_used,
             )
+
+            if settings.is_production:
+                try:
+                    boto3.client("cloudwatch", region_name=settings.AWS_REGION).put_metric_data(
+                        Namespace="DevPulse",
+                        MetricData=[
+                            {
+                                "MetricName": "ReviewCompleted",
+                                "Dimensions": [
+                                    {"Name": "Environment", "Value": settings.ENVIRONMENT}
+                                ],
+                                "Value": 1,
+                                "Unit": "Count",
+                            }
+                        ],
+                    )
+                except Exception:
+                    logger.warning("Failed to emit ReviewCompleted metric to CloudWatch")
+
             return review
 
         except Exception as exc:
             pr.status = "failed"
             await self._db.flush()
             logger.error("Review failed", pr_id=str(pr_id), error=str(exc))
+
+            if settings.is_production:
+                try:
+                    boto3.client("cloudwatch", region_name=settings.AWS_REGION).put_metric_data(
+                        Namespace="DevPulse",
+                        MetricData=[
+                            {
+                                "MetricName": "ReviewFailed",
+                                "Dimensions": [
+                                    {"Name": "Environment", "Value": settings.ENVIRONMENT}
+                                ],
+                                "Value": 1,
+                                "Unit": "Count",
+                            }
+                        ],
+                    )
+                except Exception:
+                    logger.warning("Failed to emit ReviewFailed metric to CloudWatch")
+
             raise
