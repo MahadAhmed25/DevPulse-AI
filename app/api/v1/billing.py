@@ -1,12 +1,17 @@
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_active_user
 from app.config import get_settings
 from app.database import get_db
+from app.models.pull_request import PullRequest
+from app.models.repository import Repository
+from app.models.review import Review
 from app.models.user import User
 from app.services.stripe_service import StripeService
 
@@ -64,5 +69,54 @@ async def stripe_webhook(
     sig_header = request.headers.get("stripe-signature", "")
 
     stripe_service = StripeService()
-    await stripe_service.handle_webhook(payload, sig_header, db)
+    try:
+        await stripe_service.handle_webhook(payload, sig_header, db)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe signature")
     return {"status": "ok"}
+
+
+_TIER_LIMITS: dict[str, dict[str, int | None]] = {
+    "free":  {"review_limit": 3,    "repo_limit": 1},
+    "pro":   {"review_limit": None, "repo_limit": 5},
+    "team":  {"review_limit": None, "repo_limit": None},
+}
+
+
+@router.get("/status")
+async def billing_status(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Return current billing tier, usage, and limits."""
+    tier = current_user.subscription_tier
+    limits = _TIER_LIMITS.get(tier, _TIER_LIMITS["free"])
+
+    start_of_month = datetime.now(UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    reviews_this_month = (
+        await db.execute(
+            select(func.count(Review.id))
+            .select_from(Review)
+            .join(PullRequest, Review.pull_request_id == PullRequest.id)
+            .join(Repository, PullRequest.repository_id == Repository.id)
+            .where(
+                Repository.owner_id == current_user.id,
+                Review.created_at >= start_of_month,
+            )
+        )
+    ).scalar_one()
+
+    repo_count = (
+        await db.execute(
+            select(func.count()).where(Repository.owner_id == current_user.id)
+        )
+    ).scalar_one()
+
+    return {
+        "tier": tier,
+        "reviews_this_month": reviews_this_month,
+        "review_limit": limits["review_limit"],
+        "repo_count": repo_count,
+        "repo_limit": limits["repo_limit"],
+    }

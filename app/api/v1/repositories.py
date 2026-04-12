@@ -24,6 +24,12 @@ router = APIRouter()
 
 FREE_TIER_MONTHLY_LIMIT = 3
 
+_REPO_LIMITS: dict[str, int | None] = {
+    "free": 1,
+    "pro": 5,
+    "team": None,
+}
+
 
 @router.get("", response_model=RepositoryList)
 async def list_repositories(
@@ -54,6 +60,19 @@ async def add_repository(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Repository:
+    repo_limit = _REPO_LIMITS.get(current_user.subscription_tier)
+    if repo_limit is not None:
+        current_count = (
+            await db.execute(
+                select(func.count()).where(Repository.owner_id == current_user.id)
+            )
+        ).scalar_one()
+        if current_count >= repo_limit:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail={"error": "repo_limit_reached", "upgrade_url": "/billing"},
+            )
+
     existing = await db.execute(
         select(Repository).where(Repository.github_repo_id == payload.github_repo_id)
     )

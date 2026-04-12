@@ -6,6 +6,9 @@ import structlog
 
 def configure_logging(log_level: str = "INFO") -> None:
     """Configure structlog for structured JSON output (CloudWatch-friendly)."""
+    from app.config import get_settings
+
+    settings = get_settings()
 
     shared_processors: list[structlog.types.Processor] = [
         structlog.contextvars.merge_contextvars,
@@ -36,8 +39,19 @@ def configure_logging(log_level: str = "INFO") -> None:
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
 
+    handlers: list[logging.Handler] = [handler]
+
+    if settings.is_production:
+        import watchtower
+
+        cw_handler = watchtower.CloudWatchLogHandler(
+            log_group_name=settings.CLOUDWATCH_LOG_GROUP,
+        )
+        cw_handler.setFormatter(formatter)
+        handlers.append(cw_handler)
+
     root_logger = logging.getLogger()
-    root_logger.handlers = [handler]
+    root_logger.handlers = handlers
     root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
     # Silence noisy libraries

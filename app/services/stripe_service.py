@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 import stripe
@@ -31,13 +32,15 @@ class StripeService:
         customer_id = user.stripe_customer_id
 
         if not customer_id:
-            customer = stripe.Customer.create(
+            customer = await asyncio.to_thread(
+                stripe.Customer.create,
                 email=user.email,
                 metadata={"user_id": str(user.id)},
             )
             customer_id = customer.id
 
-        session = stripe.checkout.Session.create(
+        session = await asyncio.to_thread(
+            stripe.checkout.Session.create,
             customer=customer_id,
             mode="subscription",
             line_items=[{"price": price_id, "quantity": 1}],
@@ -48,7 +51,8 @@ class StripeService:
         return session.url or ""
 
     async def create_portal_session(self, customer_id: str, return_url: str) -> str:
-        session = stripe.billing_portal.Session.create(
+        session = await asyncio.to_thread(
+            stripe.billing_portal.Session.create,
             customer=customer_id,
             return_url=return_url,
         )
@@ -61,8 +65,11 @@ class StripeService:
         db: AsyncSession,
     ) -> None:
         try:
-            event = stripe.Webhook.construct_event(
-                payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+            event = await asyncio.to_thread(
+                stripe.Webhook.construct_event,
+                payload,
+                sig_header,
+                settings.STRIPE_WEBHOOK_SECRET,
             )
         except stripe.error.SignatureVerificationError:
             logger.warning("Invalid Stripe webhook signature")
@@ -83,7 +90,7 @@ class StripeService:
         customer_id: str = session["customer"]
         subscription_id: str = session["subscription"]
 
-        subscription = stripe.Subscription.retrieve(subscription_id)
+        subscription = await asyncio.to_thread(stripe.Subscription.retrieve, subscription_id)
         price_id: str = subscription["items"]["data"][0]["price"]["id"]
         tier = TIER_BY_PRICE.get(price_id, "free")
 
