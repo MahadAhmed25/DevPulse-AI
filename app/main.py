@@ -12,7 +12,7 @@ from slowapi.util import get_remote_address
 
 from app.api.v1.router import api_router
 from app.config import get_settings
-from app.utils.logging import configure_logging
+from app.utils.logging import RequestIDMiddleware, configure_logging
 
 logger = structlog.get_logger(__name__)
 settings = get_settings()
@@ -58,6 +58,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestIDMiddleware)
 
 app.include_router(api_router, prefix="/api/v1")
 

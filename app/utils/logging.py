@@ -1,7 +1,33 @@
 import logging
 import sys
+import time
+import uuid
 
 import structlog
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.requests import Request
+from starlette.responses import Response
+
+_logger = structlog.get_logger(__name__)
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        request_id = str(uuid.uuid4())
+        structlog.contextvars.bind_contextvars(request_id=request_id)
+        start = time.monotonic()
+        response = await call_next(request)
+        duration_ms = round((time.monotonic() - start) * 1000)
+        _logger.info(
+            "request",
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+            request_id=request_id,
+        )
+        structlog.contextvars.clear_contextvars()
+        return response
 
 
 def configure_logging(log_level: str = "INFO") -> None:

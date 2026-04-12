@@ -31,6 +31,9 @@ async def github_webhook(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature"
         )
 
+    if x_github_event == "ping":
+        return {"message": "pong"}
+
     if x_github_event != "pull_request":
         return {"status": "ignored", "event": x_github_event}
 
