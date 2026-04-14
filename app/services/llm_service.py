@@ -47,6 +47,17 @@ If the diff is clean, return empty comments array and verdict "approve".
 Never make up file paths or line numbers — only reference what is in the diff."""
 
 
+def _strip_code_fence(text: str) -> str:
+    """Remove markdown code fences (```json ... ``` or ``` ... ```) if present."""
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        # Drop the opening fence line and the closing ``` line
+        inner = lines[1:-1] if lines[-1].strip() == "```" else lines[1:]
+        text = "\n".join(inner).strip()
+    return text
+
+
 class LLMService:
     def __init__(self) -> None:
         settings = get_settings()
@@ -82,7 +93,7 @@ class LLMService:
         raw = response.content[0].text.strip()  # type: ignore[union-attr]
 
         try:
-            data = json.loads(raw)
+            data = json.loads(_strip_code_fence(raw))
         except json.JSONDecodeError:
             # Retry once with an explicit JSON-only instruction
             retry_messages = messages + [
@@ -97,7 +108,9 @@ class LLMService:
             )
             tokens_used += response2.usage.input_tokens + response2.usage.output_tokens
             raw2 = response2.content[0].text.strip()  # type: ignore[union-attr]
-            data = json.loads(raw2)
+            if not raw2:
+                raise ValueError("LLM returned empty response on JSON retry")
+            data = json.loads(_strip_code_fence(raw2))
 
         processing_time_ms = int((time.perf_counter() - start) * 1000)
 
