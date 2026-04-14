@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,7 +35,7 @@ class Review(Base):
     tokens_used: Mapped[int | None] = mapped_column(Integer, nullable=True)
     processing_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     posted_to_github: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    github_review_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    github_review_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
