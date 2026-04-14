@@ -54,11 +54,9 @@ class EmbeddingService:
         return embedding
 
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        """Embed a list of texts with bounded concurrency. Returns in input order."""
-        semaphore = asyncio.Semaphore(10)
-
-        async def _embed_with_sem(text: str) -> list[float]:
-            async with semaphore:
-                return await self.embed_text(text)
-
-        return list(await asyncio.gather(*(_embed_with_sem(t) for t in texts)))
+        """Embed a list of texts sequentially with a delay to stay under Bedrock RPM limits."""
+        results = []
+        for text in texts:
+            results.append(await self.embed_text(text))
+            await asyncio.sleep(0.8)
+        return results
