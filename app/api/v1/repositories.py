@@ -6,6 +6,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_active_user
 from app.database import get_db
@@ -120,7 +121,9 @@ async def remove_repository(
     current_user: User = Depends(get_current_active_user),
 ) -> None:
     result = await db.execute(
-        select(Repository).where(Repository.id == repo_id, Repository.owner_id == current_user.id)
+        select(Repository)
+        .where(Repository.id == repo_id, Repository.owner_id == current_user.id)
+        .options(selectinload(Repository.pull_requests))
     )
     repo = result.scalar_one_or_none()
     if repo is None:
