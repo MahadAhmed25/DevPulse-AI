@@ -14,11 +14,26 @@ logger = structlog.get_logger(__name__)
 
 
 def _run_async(coro):  # type: ignore[no-untyped-def]
-    """Run an async coroutine from a synchronous Celery task."""
+    """Run an async coroutine from a synchronous Celery task.
+
+    Celery uses prefork workers. The module-level SQLAlchemy engine is created
+    once at import time and its asyncpg connection pool holds connections bound
+    to the parent process event loop. Each call to _run_async creates a fresh
+    event loop, so we must dispose the engine first to flush all stale pool
+    connections — otherwise asyncpg raises 'Future attached to a different loop'.
+    """
+    from app.database import engine
+
     loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
+        loop.run_until_complete(engine.dispose())
         return loop.run_until_complete(coro)
     finally:
+        try:
+            loop.run_until_complete(engine.dispose())
+        except Exception:
+            pass
         loop.close()
 
 

@@ -158,6 +158,10 @@ class RAGService:
         """Return the top-k relevant code chunks for the given query."""
         query_vec = await self._embedder.embed_text(query)
 
+        # asyncpg cannot bind a Python list directly to a vector parameter.
+        # Serialize to pgvector's string literal format: '[0.1, 0.2, ...]'
+        vec_str = str(query_vec)
+
         rows = await self._db.execute(
             text(
                 """
@@ -167,6 +171,6 @@ class RAGService:
                 LIMIT :k
                 """
             ),
-            {"repo_id": repo_id, "vec": query_vec, "k": k},
+            {"repo_id": repo_id, "vec": vec_str, "k": k},
         )
         return [row.content for row in rows]
